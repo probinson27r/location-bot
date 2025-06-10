@@ -1,0 +1,57 @@
+{
+  "name": "location-bot",
+  "version": "1.0.0",
+  "description": "Microsoft Teams bot for tracking daily work locations",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "echo 'Linting...' && echo 'No linter configured yet'",
+    "lint:fix": "echo 'Fix linting...' && echo 'No linter configured yet'",
+    "docker:build": "docker build -t location-bot .",
+    "docker:run": "docker run -p 3978:3978 --env-file .env location-bot",
+    "docker:compose": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'"
+  },
+  "dependencies": {
+    "botbuilder": "^4.20.0",
+    "botbuilder-adapter-teams": "^1.0.0",
+    "restify": "^11.1.0",
+    "sqlite3": "^5.1.6",
+    "node-schedule": "^2.1.1",
+    "axios": "^1.6.0",
+    "moment-timezone": "^0.5.43",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
+  },
+  "keywords": [
+    "microsoft-teams",
+    "bot",
+    "location-tracking",
+    "nodejs",
+    "bot-framework",
+    "workplace",
+    "teams-bot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/location-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/location-bot/issues"
+  },
+  "homepage": "https://github.com/yourusername/location-bot#readme",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+} 
