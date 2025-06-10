@@ -17,6 +17,7 @@ class LocationScheduler {
         await this.database.initialize();
         this.scheduleDailyPrompts();
         this.scheduleReminders();
+        this.scheduleDailyReset();
         console.log('Location scheduler initialized');
     }
 
@@ -49,7 +50,18 @@ class LocationScheduler {
     }
 
     /**
-     * Send daily location prompts to all users
+     * Schedule daily reset at 11:59 PM
+     */
+    scheduleDailyReset() {
+        this.jobs.dailyReset = schedule.scheduleJob(config.schedules.dailyReset, async () => {
+            await this.performDailyReset();
+        });
+        
+        console.log('Daily reset scheduled for 11:59 PM (Monday-Friday)');
+    }
+
+    /**
+     * Send daily location prompts to all users with tenant isolation
      */
     async sendDailyLocationPrompts() {
         try {
@@ -62,32 +74,51 @@ class LocationScheduler {
                 return;
             }
 
-            console.log(`Sending daily location prompts for ${currentDate}`);
+            console.log(`🔄 Sending daily location prompts for ${currentDate} (processing all tenants)`);
 
-            // Get all users from database
-            const users = await this.database.getAllUsers();
+            // Get all users from database (this now returns users with tenant_id)
+            const allUsers = await this.database.getAllUsers(''); // Empty string to get all tenants for migration
             
-            for (const user of users) {
-                try {
-                    // Check if user already responded today
-                    const hasResponded = await this.database.hasUserRespondedToday(user.id, currentDate);
-                    
-                    if (!hasResponded) {
-                        await this.sendLocationPromptToUser(user, false, 0);
-                        // Add pending reminder for this user
-                        await this.database.addPendingReminder(user.id, currentDate);
+            // Group users by tenant for processing
+            const usersByTenant = {};
+            allUsers.forEach(user => {
+                const tenantId = user.tenant_id || 'unknown-tenant';
+                if (!usersByTenant[tenantId]) {
+                    usersByTenant[tenantId] = [];
+                }
+                usersByTenant[tenantId].push(user);
+            });
+
+            console.log(`📊 Processing daily prompts for ${Object.keys(usersByTenant).length} tenants`);
+
+            // Process each tenant separately
+            for (const [tenantId, users] of Object.entries(usersByTenant)) {
+                console.log(`🏢 Processing ${users.length} users for tenant: ${tenantId}`);
+                
+                for (const user of users) {
+                    try {
+                        // Check if user already responded today (with tenant isolation)
+                        const hasResponded = await this.database.hasUserRespondedToday(tenantId, user.id, currentDate);
+                        
+                        if (!hasResponded) {
+                            await this.sendLocationPromptToUser(user, false, 0);
+                            // Add pending reminder for this user (with tenant isolation)
+                            await this.database.addPendingReminder(tenantId, user.id, currentDate);
+                        }
+                    } catch (error) {
+                        console.error(`Error sending prompt to user ${user.display_name} (tenant: ${tenantId}):`, error);
                     }
-                } catch (error) {
-                    console.error(`Error sending prompt to user ${user.display_name}:`, error);
                 }
             }
+            
+            console.log(`✅ Daily prompts completed for all tenants`);
         } catch (error) {
             console.error('Error in daily location prompts:', error);
         }
     }
 
     /**
-     * Send reminder prompts to users who haven't responded
+     * Send reminder prompts to users who haven't responded with tenant isolation
      */
     async sendReminders(reminderNumber) {
         try {
@@ -100,28 +131,45 @@ class LocationScheduler {
                 return;
             }
 
-            console.log(`Sending reminder ${reminderNumber} for ${currentDate}`);
+            console.log(`🔔 Sending reminder ${reminderNumber} for ${currentDate} (processing all tenants)`);
 
-            // Get users who need reminders
-            const pendingReminders = await this.database.getPendingReminders(currentDate);
-            
-            for (const reminder of pendingReminders) {
+            // Get all tenants by getting all users and extracting unique tenant IDs
+            const allUsers = await this.database.getAllUsers(''); // Get all users across tenants
+            const tenantIds = [...new Set(allUsers.map(user => user.tenant_id || 'unknown-tenant'))];
+
+            console.log(`📊 Processing reminders for ${tenantIds.length} tenants`);
+
+            // Process each tenant separately
+            for (const tenantId of tenantIds) {
+                console.log(`🏢 Processing reminders for tenant: ${tenantId}`);
+                
                 try {
-                    // Check if this reminder number should be sent
-                    if (reminder.reminder_count < reminderNumber) {
-                        const user = {
-                            id: reminder.user_id,
-                            teams_user_id: reminder.teams_user_id,
-                            display_name: reminder.display_name
-                        };
-                        
-                        await this.sendLocationPromptToUser(user, true, reminder.reminder_count);
-                        await this.database.updateReminderCount(reminder.user_id, currentDate);
+                    // Get users who need reminders for this specific tenant
+                    const pendingReminders = await this.database.getPendingReminders(tenantId, currentDate);
+                    
+                    for (const reminder of pendingReminders) {
+                        try {
+                            // Check if this reminder number should be sent
+                            if (reminder.reminder_count < reminderNumber) {
+                                const user = {
+                                    id: reminder.user_id,
+                                    teams_user_id: reminder.teams_user_id,
+                                    display_name: reminder.display_name
+                                };
+                                
+                                await this.sendLocationPromptToUser(user, true, reminder.reminder_count);
+                                await this.database.updateReminderCount(tenantId, reminder.user_id, currentDate);
+                            }
+                        } catch (error) {
+                            console.error(`Error sending reminder to user ${reminder.display_name} (tenant: ${tenantId}):`, error);
+                        }
                     }
                 } catch (error) {
-                    console.error(`Error sending reminder to user ${reminder.display_name}:`, error);
+                    console.error(`Error processing reminders for tenant ${tenantId}:`, error);
                 }
             }
+            
+            console.log(`✅ Reminders completed for all tenants`);
         } catch (error) {
             console.error('Error in sending reminders:', error);
         }
@@ -163,6 +211,70 @@ class LocationScheduler {
     async triggerReminders(reminderNumber = 1) {
         console.log(`Manually triggering reminder ${reminderNumber}...`);
         await this.sendReminders(reminderNumber);
+    }
+
+    /**
+     * Perform daily reset with tenant isolation - clear pending reminders and optionally send summary
+     */
+    async performDailyReset() {
+        try {
+            const currentDate = this.holidayService.getCurrentDate();
+            
+            // Check if today was a working day
+            const isWorkingDay = await this.holidayService.isWorkingDay(currentDate);
+            if (!isWorkingDay) {
+                console.log(`Skipping daily reset - ${currentDate} was not a working day`);
+                return;
+            }
+
+            console.log(`🔄 Performing daily reset for ${currentDate} (processing all tenants)`);
+
+            // Get all tenants by getting all users and extracting unique tenant IDs
+            const allUsers = await this.database.getAllUsers(''); // Get all users across tenants
+            const tenantIds = [...new Set(allUsers.map(user => user.tenant_id || 'unknown-tenant'))];
+
+            console.log(`📊 Processing daily reset for ${tenantIds.length} tenants`);
+
+            // Process each tenant separately
+            for (const tenantId of tenantIds) {
+                console.log(`🏢 Processing daily reset for tenant: ${tenantId}`);
+                
+                try {
+                    // Get daily statistics before clearing for this tenant
+                    const stats = await this.database.getDailyStatistics(tenantId, currentDate);
+                    const nonRespondingUsers = await this.database.getUsersWhoDidntRespond(tenantId, currentDate);
+
+                    // Clear pending reminders for today for this tenant
+                    const clearedReminders = await this.database.clearAllPendingReminders(tenantId, currentDate);
+
+                    // Log end-of-day summary per tenant
+                    console.log(`📊 End-of-day summary for ${currentDate} (tenant: ${tenantId}):`);
+                    console.log(`   ✅ ${stats.responded_users}/${stats.total_users} users responded`);
+                    console.log(`   🏠 ${stats.remote_users || 0} Remote | 🏢 ${stats.office_users || 0} Office`);
+                    console.log(`   📝 ${stats.total_updates || 0} total location updates`);
+                    console.log(`   🗑️ ${clearedReminders} pending reminders cleared`);
+                    
+                    if (nonRespondingUsers.length > 0) {
+                        console.log(`   ❌ Users who didn't respond: ${nonRespondingUsers.map(u => u.display_name).join(', ')}`);
+                    }
+                } catch (error) {
+                    console.error(`Error processing daily reset for tenant ${tenantId}:`, error);
+                }
+            }
+
+            console.log(`🌙 Daily reset completed for ${currentDate}. Ready for next working day.`);
+
+        } catch (error) {
+            console.error('Error in daily reset:', error);
+        }
+    }
+
+    /**
+     * Manually trigger daily reset (for testing)
+     */
+    async triggerDailyReset() {
+        console.log('Manually triggering daily reset...');
+        await this.performDailyReset();
     }
 
     /**

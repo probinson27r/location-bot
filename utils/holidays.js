@@ -200,6 +200,121 @@ class HolidayService {
     formatDate(date, format = 'dddd, MMMM Do YYYY') {
         return moment(date).tz(this.timezone).format(format);
     }
+
+    /**
+     * Get holidays for the next 12 months from current date
+     */
+    async getUpcomingHolidays() {
+        const now = this.getCurrentTime();
+        const currentYear = now.year();
+        const nextYear = currentYear + 1;
+        
+        console.log(`🎄 Fetching holidays for next 12 months from ${now.format('YYYY-MM-DD')}`);
+        
+        try {
+            // Get holidays for both current and next year to cover 12 months
+            const [currentYearHolidays, nextYearHolidays] = await Promise.all([
+                this.getHolidaysForYear(currentYear),
+                this.getHolidaysForYear(nextYear)
+            ]);
+            
+            // Combine holidays from both years
+            const allHolidays = [...currentYearHolidays, ...nextYearHolidays];
+            
+            // Filter holidays for the next 12 months
+            const endDate = moment(now).add(12, 'months');
+            const upcomingHolidays = allHolidays
+                .filter(holiday => {
+                    const holidayDate = moment(holiday.date);
+                    return holidayDate.isAfter(now, 'day') && holidayDate.isBefore(endDate);
+                })
+                .sort((a, b) => moment(a.date).diff(moment(b.date)));
+            
+            console.log(`🎄 Found ${upcomingHolidays.length} upcoming holidays`);
+            
+            return upcomingHolidays;
+            
+        } catch (error) {
+            console.error('🎄 Error fetching upcoming holidays:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get the next few upcoming holidays (useful for quick reference)
+     */
+    async getNextHolidays(count = 5) {
+        const upcomingHolidays = await this.getUpcomingHolidays();
+        return upcomingHolidays.slice(0, count);
+    }
+
+    /**
+     * Check if a holiday is this week
+     */
+    isThisWeek(date) {
+        const now = this.getCurrentTime();
+        const holidayDate = moment(date).tz(this.timezone);
+        
+        return holidayDate.isSame(now, 'week');
+    }
+
+    /**
+     * Check if a holiday is next week
+     */
+    isNextWeek(date) {
+        const now = this.getCurrentTime();
+        const nextWeek = moment(now).add(1, 'week');
+        const holidayDate = moment(date).tz(this.timezone);
+        
+        return holidayDate.isSame(nextWeek, 'week');
+    }
+
+    /**
+     * Get days until a holiday
+     */
+    getDaysUntilHoliday(date) {
+        const now = this.getCurrentTime();
+        const holidayDate = moment(date).tz(this.timezone);
+        
+        return holidayDate.diff(now, 'days');
+    }
+
+    /**
+     * Format holidays for display with enhanced information
+     */
+    formatHolidaysForDisplay(holidays) {
+        const now = this.getCurrentTime();
+        
+        return holidays.map(holiday => {
+            const holidayDate = moment(holiday.date).tz(this.timezone);
+            const daysUntil = this.getDaysUntilHoliday(holiday.date);
+            const dayOfWeek = holidayDate.format('dddd');
+            const formattedDate = holidayDate.format('D MMMM YYYY');
+            
+            let timeIndicator = '';
+            if (daysUntil === 0) {
+                timeIndicator = '🎉 TODAY';
+            } else if (daysUntil === 1) {
+                timeIndicator = '⭐ Tomorrow';
+            } else if (this.isThisWeek(holiday.date)) {
+                timeIndicator = '📅 This week';
+            } else if (this.isNextWeek(holiday.date)) {
+                timeIndicator = '📅 Next week';
+            } else if (daysUntil <= 30) {
+                timeIndicator = `📅 In ${daysUntil} days`;
+            } else {
+                timeIndicator = `📅 In ${Math.round(daysUntil / 30)} months`;
+            }
+            
+            return {
+                ...holiday,
+                formattedDate,
+                dayOfWeek,
+                daysUntil,
+                timeIndicator
+            };
+        });
+    }
 }
 
 module.exports = HolidayService; 

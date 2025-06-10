@@ -18,14 +18,14 @@ module.exports = {
     schedules: {
         dailyPrompt: '00 09 * * 1-5', // 9:00 AM Monday-Friday
         firstReminder: '30 09 * * 1-5', // 9:30 AM Monday-Friday
-        secondReminder: '00 10 * * 1-5' // 10:00 AM Monday-Friday
+        secondReminder: '00 10 * * 1-5', // 10:00 AM Monday-Friday
+        dailyReset: '59 23 * * 1-5' // 11:59 PM Monday-Friday
     },
     
     // Work location options
     workLocations: {
         REMOTE: 'Remote',
-        OFFICE: 'Office',
-        HYBRID: 'Hybrid'
+        OFFICE: 'Office'
     },
     
     // Holiday API

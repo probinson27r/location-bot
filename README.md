@@ -33,6 +33,33 @@ A comprehensive Microsoft Teams bot that automatically asks team members about t
 - **Statistics API**: Retrieve location data for reporting and analytics
 - **Detailed Tracking**: Full audit trail of all location changes throughout the day
 
+## 🤖 AI-Powered Features
+
+The Location Bot now includes an AI agent that intelligently processes user messages to determine work location intent:
+
+### AI Capabilities
+- **Smart Message Analysis**: Uses OpenAI's GPT models to understand natural language
+- **Confidence Scoring**: Shows how confident the AI is about its interpretation  
+- **Context Understanding**: Distinguishes between casual conversation and location updates
+- **Multi-category Detection**: Office, Remote, Not Working (sick/holiday/vacation)
+- **Fallback Processing**: Automatically falls back to rule-based processing if AI is unavailable
+
+### Supported Phrases
+The AI can understand phrases like:
+- **Office**: "I'm at the office today", "Going to work now", "In the building"
+- **Remote**: "Working from home", "WFH today", "Remote work today"  
+- **Not Working**: "I'm sick today", "On holiday this week", "Taking a day off"
+
+### Configuration
+Add your OpenAI API key to the environment:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Get your API key from: https://platform.openai.com/api-keys
+
+If no API key is provided, the bot automatically falls back to rule-based pattern matching.
+
 ## 🏗️ Architecture
 
 ```
@@ -176,6 +203,70 @@ Users can interact with the bot using these commands:
 | `location [name]` | Alternative way to find someone's location |
 | `find [name]` | Another way to search for team members |
 | `help` | Show available commands and bot information |
+
+### Holiday Commands
+| Command | Description |
+|---------|-------------|
+| `holidays` or `public holidays` | View all public holidays for the next 12 months |
+| `next holidays` or `upcoming holidays` | View the next 5 upcoming holidays |
+
+**Holiday Features:**
+- 🌐 **Live Data**: Uses the Nager.at API for up-to-date Western Australia public holidays
+- 📅 **12-Month View**: Shows all holidays for the next year from current date
+- ⭐ **Smart Timing**: Highlights holidays happening soon with special indicators
+- 📍 **Location Integration**: Bot automatically skips work reminders on public holidays
+- 🎄 **Rich Display**: Shows holiday names, dates, days of the week, and time until holiday
+- 🤖 **AI-Powered Queries**: Ask naturally like "When is the next holiday?" or "What holidays are coming up?"
+
+### Sample Holiday Output
+
+#### Next 5 Holidays (`next holidays`)
+```
+🎄 Next 5 Public Holidays in Western Australia
+
+1. ⭐ Christmas Day
+   📅 Wednesday, 25 December 2024
+   📅 In 3 days
+
+2. 🎄 Boxing Day
+   📅 Thursday, 26 December 2024
+   📅 In 4 days
+
+3. 🎄 New Year's Day
+   📅 Wednesday, 1 January 2025
+   📅 In 10 days
+
+4. 🎄 Australia Day
+   📅 Sunday, 26 January 2025
+   📅 In 1 month
+
+5. 🎄 Labour Day
+   📅 Monday, 3 March 2025
+   📅 In 2 months
+```
+
+#### Full Holiday List (`holidays`)
+```
+🎄 Public Holidays in Western Australia - Next 12 Months
+
+📅 Found 12 upcoming public holidays
+
+December 2024
+🎄 Christmas Day
+   📅 Wednesday, 25 December 2024
+   📅 In 3 days
+
+🎄 Boxing Day
+   📅 Thursday, 26 December 2024
+   📅 In 4 days
+
+January 2025
+🎄 New Year's Day
+   📅 Wednesday, 1 January 2025
+   📅 In 10 days
+
+...and more
+```
 
 ## 🎨 User Experience
 

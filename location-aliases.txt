@@ -1,0 +1,28 @@
+# Location Aliases Configuration
+# Format: alias=location_type
+# location_type must be: remote, office, or clear
+
+# Remote aliases
+home=remote
+wfh=remote
+remote=remote
+working_from_home=remote
+
+# Office aliases
+office=office
+work=office
+site=office
+building=office
+workplace=office
+
+# Clear/Not working aliases
+clear=clear
+not_working=clear
+holiday=clear
+sick=clear
+vacation=clear
+off=clear
+absent=clear
+leave=clear
+unwell=clear
+ill=clear 

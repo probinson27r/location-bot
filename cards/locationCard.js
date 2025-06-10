@@ -49,114 +49,6 @@ function createLocationCard(userName, isReminder = false, reminderCount = 0) {
                             location: 'Office'
                         },
                         style: 'positive'
-                    },
-                    {
-                        type: 'Action.Submit',
-                        title: '🔄 Hybrid',
-                        data: {
-                            action: 'location_selected',
-                            location: 'Hybrid'
-                        },
-                        style: 'positive'
-                    }
-                ],
-                spacing: 'Large'
-            }
-        ]
-    };
-
-    return CardFactory.adaptiveCard(card);
-}
-
-/**
- * Create the hybrid location details card
- */
-function createHybridLocationCard(userName) {
-    const card = {
-        type: 'AdaptiveCard',
-        version: '1.4',
-        body: [
-            {
-                type: 'TextBlock',
-                text: 'Hybrid Work Location Details',
-                size: 'Large',
-                weight: 'Bolder',
-                color: 'Accent'
-            },
-            {
-                type: 'TextBlock',
-                text: `Thanks ${userName}! Since you selected Hybrid, please let us know your location for each part of the day:`,
-                wrap: true,
-                spacing: 'Medium'
-            },
-            {
-                type: 'Container',
-                style: 'emphasis',
-                items: [
-                    {
-                        type: 'TextBlock',
-                        text: 'Morning Location (AM)',
-                        weight: 'Bolder',
-                        size: 'Medium'
-                    },
-                    {
-                        type: 'Input.ChoiceSet',
-                        id: 'morningLocation',
-                        placeholder: 'Select your morning location',
-                        choices: [
-                            {
-                                title: '🏠 Remote (Morning)',
-                                value: 'Remote'
-                            },
-                            {
-                                title: '🏢 Office (Morning)',
-                                value: 'Office'
-                            }
-                        ],
-                        style: 'compact'
-                    }
-                ],
-                spacing: 'Medium'
-            },
-            {
-                type: 'Container',
-                style: 'emphasis',
-                items: [
-                    {
-                        type: 'TextBlock',
-                        text: 'Afternoon Location (PM)',
-                        weight: 'Bolder',
-                        size: 'Medium'
-                    },
-                    {
-                        type: 'Input.ChoiceSet',
-                        id: 'afternoonLocation',
-                        placeholder: 'Select your afternoon location',
-                        choices: [
-                            {
-                                title: '🏠 Remote (Afternoon)',
-                                value: 'Remote'
-                            },
-                            {
-                                title: '🏢 Office (Afternoon)',
-                                value: 'Office'
-                            }
-                        ],
-                        style: 'compact'
-                    }
-                ],
-                spacing: 'Medium'
-            },
-            {
-                type: 'ActionSet',
-                actions: [
-                    {
-                        type: 'Action.Submit',
-                        title: 'Submit Hybrid Locations',
-                        data: {
-                            action: 'hybrid_submitted'
-                        },
-                        style: 'positive'
                     }
                 ],
                 spacing: 'Large'
@@ -173,9 +65,7 @@ function createHybridLocationCard(userName) {
 function createConfirmationCard(userName, location, morningLocation = null, afternoonLocation = null, isUpdate = false) {
     let locationText = '';
     
-    if (location === 'Hybrid') {
-        locationText = `🔄 Hybrid - Morning: ${morningLocation === 'Remote' ? '🏠 Remote' : '🏢 Office'}, Afternoon: ${afternoonLocation === 'Remote' ? '🏠 Remote' : '🏢 Office'}`;
-    } else if (location === 'Remote') {
+    if (location === 'Remote') {
         locationText = '🏠 Remote';
     } else if (location === 'Office') {
         locationText = '🏢 Office';
@@ -188,7 +78,7 @@ function createConfirmationCard(userName, location, morningLocation = null, afte
 
     const card = {
         type: 'AdaptiveCard',
-        version: '1.4',
+        version: '1.2',
         body: [
             {
                 type: 'TextBlock',
@@ -232,8 +122,8 @@ function createConfirmationCard(userName, location, morningLocation = null, afte
                     {
                         type: 'TextBlock',
                         text: isUpdate 
-                            ? '💡 You can update your location anytime by typing "remote", "office", or "hybrid"'
-                            : '💡 You can change your location anytime throughout the day by typing "remote", "office", or "hybrid"',
+                            ? '💡 You can update your location anytime by typing "remote" or "office"'
+                            : '💡 You can change your location anytime throughout the day by typing "remote" or "office"',
                         wrap: true,
                         size: 'Small',
                         color: 'Accent'
@@ -289,216 +179,138 @@ function createErrorCard(userName, errorMessage) {
 }
 
 /**
- * Create team location overview card
+ * Create team location overview card (simplified version)
  */
 function createTeamLocationCard(teamLocations, date) {
     const totalMembers = teamLocations.length;
     const membersWithLocation = teamLocations.filter(member => member.work_location).length;
-    const membersWithoutLocation = totalMembers - membersWithLocation;
-
+    
     // Group by location type
     const locationCounts = {
-        Remote: 0,
-        Office: 0,
-        Hybrid: 0
+        Remote: teamLocations.filter(m => m.work_location === 'Remote').length,
+        Office: teamLocations.filter(m => m.work_location === 'Office').length
     };
 
-    const locationItems = [];
-
-    teamLocations.forEach(member => {
-        if (member.work_location) {
-            locationCounts[member.work_location]++;
-            
-            let locationText = '';
-            let icon = '';
-            
-            if (member.work_location === 'Remote') {
-                locationText = '🏠 Remote';
-                icon = '🏠';
-            } else if (member.work_location === 'Office') {
-                locationText = '🏢 Office';
-                icon = '🏢';
-            } else if (member.work_location === 'Hybrid') {
-                locationText = `🔄 Hybrid (AM: ${member.morning_location === 'Remote' ? '🏠' : '🏢'}, PM: ${member.afternoon_location === 'Remote' ? '🏠' : '🏢'})`;
-                icon = '🔄';
-            }
-            
-            const lastUpdate = member.response_time ? 
-                new Date(member.response_time).toLocaleString('en-AU', { 
-                    timeZone: 'Australia/Perth',
-                    timeStyle: 'short'
-                }) : '';
-
-            locationItems.push({
-                type: 'ColumnSet',
-                columns: [
-                    {
-                        type: 'Column',
-                        width: 'auto',
-                        items: [
-                            {
-                                type: 'TextBlock',
-                                text: icon,
-                                size: 'Medium'
-                            }
-                        ]
-                    },
-                    {
-                        type: 'Column',
-                        width: 'stretch',
-                        items: [
-                            {
-                                type: 'TextBlock',
-                                text: `**${member.display_name}**`,
-                                wrap: true,
-                                weight: 'Bolder',
-                                size: 'Small'
-                            },
-                            {
-                                type: 'TextBlock',
-                                text: locationText,
-                                wrap: true,
-                                size: 'Small'
-                            }
-                        ]
-                    },
-                    {
-                        type: 'Column',
-                        width: 'auto',
-                        items: [
-                            {
-                                type: 'TextBlock',
-                                text: lastUpdate,
-                                size: 'Small',
-                                color: 'Accent',
-                                horizontalAlignment: 'Right'
-                            }
-                        ]
-                    }
-                ],
-                spacing: 'Small'
-            });
-        } else {
-            locationItems.push({
-                type: 'ColumnSet',
-                columns: [
-                    {
-                        type: 'Column',
-                        width: 'auto',
-                        items: [
-                            {
-                                type: 'TextBlock',
-                                text: '❓',
-                                size: 'Medium'
-                            }
-                        ]
-                    },
-                    {
-                        type: 'Column',
-                        width: 'stretch',
-                        items: [
-                            {
-                                type: 'TextBlock',
-                                text: `**${member.display_name}**`,
-                                wrap: true,
-                                weight: 'Bolder',
-                                size: 'Small'
-                            },
-                            {
-                                type: 'TextBlock',
-                                text: 'No location set',
-                                wrap: true,
-                                size: 'Small',
-                                color: 'Warning'
-                            }
-                        ]
-                    }
-                ],
-                spacing: 'Small'
-            });
-        }
-    });
+    // Group members by location type
+    const remoteMembers = teamLocations.filter(m => m.work_location === 'Remote');
+    const officeMembers = teamLocations.filter(m => m.work_location === 'Office');
+    const noLocationMembers = teamLocations.filter(m => !m.work_location);
 
     const card = {
         type: 'AdaptiveCard',
-        version: '1.4',
+        version: '1.2', // Use older version for better compatibility
         body: [
             {
                 type: 'TextBlock',
-                text: `Team Locations - ${new Date(date).toLocaleDateString('en-AU', { 
-                    timeZone: 'Australia/Perth',
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                })}`,
+                text: '👥 Team Locations',
                 size: 'Large',
                 weight: 'Bolder',
                 color: 'Accent'
             },
             {
-                type: 'Container',
-                style: 'emphasis',
-                items: [
-                    {
-                        type: 'ColumnSet',
-                        columns: [
-                            {
-                                type: 'Column',
-                                width: 'stretch',
-                                items: [
-                                    {
-                                        type: 'TextBlock',
-                                        text: `📊 **Summary**: ${membersWithLocation}/${totalMembers} members set`,
-                                        wrap: true,
-                                        size: 'Small'
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        type: 'ColumnSet',
-                        columns: [
-                            {
-                                type: 'Column',
-                                width: 'stretch',
-                                items: [
-                                    {
-                                        type: 'TextBlock',
-                                        text: `🏠 Remote: ${locationCounts.Remote} | 🏢 Office: ${locationCounts.Office} | 🔄 Hybrid: ${locationCounts.Hybrid}`,
-                                        wrap: true,
-                                        size: 'Small'
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ],
-                spacing: 'Medium'
+                type: 'TextBlock',
+                text: new Date(date).toLocaleDateString('en-AU', { 
+                    timeZone: 'Australia/Perth',
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                size: 'Small',
+                color: 'Accent',
+                spacing: 'None'
             },
             {
-                type: 'Container',
-                items: locationItems,
+                type: 'FactSet',
+                facts: [
+                    {
+                        title: '📊 Summary:',
+                        value: `${membersWithLocation}/${totalMembers} members set their location`
+                    },
+                    {
+                        title: '🏠 Remote:',
+                        value: `${locationCounts.Remote} members`
+                    },
+                    {
+                        title: '🏢 Office:',
+                        value: `${locationCounts.Office} members`
+                    }
+                ],
                 spacing: 'Medium'
             }
         ]
     };
 
-    if (membersWithoutLocation > 0) {
+    // Add member details using simple TextBlocks
+    if (remoteMembers.length > 0) {
         card.body.push({
-            type: 'Container',
-            style: 'attention',
-            items: [
-                {
-                    type: 'TextBlock',
-                    text: `⚠️ ${membersWithoutLocation} team member${membersWithoutLocation > 1 ? 's' : ''} haven't set their location yet`,
-                    wrap: true,
-                    size: 'Small',
-                    weight: 'Bolder'
-                }
-            ],
+            type: 'TextBlock',
+            text: `🏠 Remote Workers (${remoteMembers.length})`,
+            weight: 'Bolder',
             spacing: 'Medium'
+        });
+
+        remoteMembers.forEach(member => {
+            const timeText = member.response_time ? 
+                new Date(member.response_time).toLocaleTimeString('en-AU', { 
+                    timeZone: 'Australia/Perth',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : 'No time';
+            const updatesText = member.daily_updates > 1 ? ` (${member.daily_updates} updates)` : '';
+            
+            card.body.push({
+                type: 'TextBlock',
+                text: `${member.display_name} - ${timeText}${updatesText}`,
+                spacing: 'Small',
+                size: 'Small'
+            });
+        });
+    }
+
+    if (officeMembers.length > 0) {
+        card.body.push({
+            type: 'TextBlock',
+            text: `🏢 Office Workers (${officeMembers.length})`,
+            weight: 'Bolder',
+            spacing: 'Medium'
+        });
+
+        officeMembers.forEach(member => {
+            const timeText = member.response_time ? 
+                new Date(member.response_time).toLocaleTimeString('en-AU', { 
+                    timeZone: 'Australia/Perth',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : 'No time';
+            const updatesText = member.daily_updates > 1 ? ` (${member.daily_updates} updates)` : '';
+            
+            card.body.push({
+                type: 'TextBlock',
+                text: `${member.display_name} - ${timeText}${updatesText}`,
+                spacing: 'Small',
+                size: 'Small'
+            });
+        });
+    }
+
+    if (noLocationMembers.length > 0) {
+        card.body.push({
+            type: 'TextBlock',
+            text: `❓ Not Set Yet (${noLocationMembers.length})`,
+            weight: 'Bolder',
+            spacing: 'Medium',
+            color: 'Warning'
+        });
+
+        noLocationMembers.forEach(member => {
+            card.body.push({
+                type: 'TextBlock',
+                text: `${member.display_name} (no location set)`,
+                spacing: 'Small',
+                size: 'Small',
+                color: 'Warning'
+            });
         });
     }
 
@@ -518,8 +330,6 @@ function createMemberLocationCard(memberInfo, date) {
             locationText = '🏠 Remote';
         } else if (memberInfo.work_location === 'Office') {
             locationText = '🏢 Office';
-        } else if (memberInfo.work_location === 'Hybrid') {
-            locationText = `🔄 Hybrid - Morning: ${memberInfo.morning_location === 'Remote' ? '🏠 Remote' : '🏢 Office'}, Afternoon: ${memberInfo.afternoon_location === 'Remote' ? '🏠 Remote' : '🏢 Office'}`;
         }
         
         const lastUpdate = new Date(memberInfo.response_time).toLocaleString('en-AU', { 
@@ -608,7 +418,6 @@ function createMemberLocationCard(memberInfo, date) {
 
 module.exports = {
     createLocationCard,
-    createHybridLocationCard,
     createConfirmationCard,
     createErrorCard,
     createTeamLocationCard,

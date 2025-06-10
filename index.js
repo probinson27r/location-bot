@@ -52,14 +52,14 @@ async function initializeBot() {
 }
 
 // Main bot message handler
-server.post('/api/messages', (req, res) => {
+server.post('/api/messages', async (req, res) => {
     adapter.processActivity(req, res, async (context) => {
         await bot.run(context);
     });
 });
 
 // Health check endpoint
-server.get('/health', (req, res) => {
+server.get('/health', async (req, res) => {
     const healthStatus = {
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -98,6 +98,20 @@ server.get('/admin/trigger-reminders/:number', async (req, res) => {
     } catch (error) {
         console.error('Error triggering reminders:', error);
         res.json({ error: 'Failed to trigger reminders' });
+    }
+});
+
+server.get('/admin/trigger-reset', async (req, res) => {
+    if (!scheduler) {
+        return res.json({ error: 'Scheduler not initialized' });
+    }
+    
+    try {
+        await scheduler.triggerDailyReset();
+        res.json({ message: 'Daily reset triggered successfully' });
+    } catch (error) {
+        console.error('Error triggering daily reset:', error);
+        res.json({ error: 'Failed to trigger daily reset' });
     }
 });
 
