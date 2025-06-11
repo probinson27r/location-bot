@@ -11,10 +11,6 @@
     "test:coverage": "jest --coverage",
     "lint": "echo 'Linting...' && echo 'No linter configured yet'",
     "lint:fix": "echo 'Fix linting...' && echo 'No linter configured yet'",
-    "docker:build": "docker build -t location-bot .",
-    "docker:run": "docker run -p 3978:3978 --env-file .env location-bot",
-    "docker:compose": "docker-compose up -d",
-    "docker:down": "docker-compose down",
     "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'"
   },
   "dependencies": {
