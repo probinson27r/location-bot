@@ -550,6 +550,23 @@ class Database {
         });
     }
 
+    /**
+     * Clean up old pending reminders (older than specified date)
+     */
+    async cleanupOldPendingReminders(cutoffDate) {
+        return new Promise((resolve, reject) => {
+            const sql = 'DELETE FROM pending_reminders WHERE date < ?';
+            
+            this.db.run(sql, [cutoffDate], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(this.changes); // Returns number of rows deleted
+                }
+            });
+        });
+    }
+
     close() {
         if (this.db) {
             this.db.close((err) => {

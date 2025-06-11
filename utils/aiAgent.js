@@ -40,7 +40,7 @@ class AIAgent {
         try {
             console.log(`🤖 AI Agent: Analyzing message: "${message}"`);
 
-            const systemPrompt = `You are an AI assistant that analyzes employee messages to determine their work location status.
+            const systemPrompt = `You are an AI assistant that analyzes employee messages to determine their work location status and understand conversational queries.
 
 Your job is to classify messages into one of these categories:
 - "office": User is working from the office/workplace
@@ -48,8 +48,14 @@ Your job is to classify messages into one of these categories:
 - "not_working": User is not working (sick, holiday, vacation, day off, etc.)
 - "location_query": User is asking about their own current work location/status
 - "holiday_query": User is asking about holidays/requesting holiday information
-- "team_query": User is asking about team locations/status
+- "team_query": User is asking about team locations/status OR asking about a specific person's location
 - "unclear": Message is ambiguous or doesn't contain location information
+
+IMPORTANT: For team_query category, you should detect:
+1. General team questions: "where is my team", "team status", "who is in the office"
+2. Specific person questions: "where is John today?", "is Sarah in the office?", "find Mike's location"
+
+When someone asks about a specific person (like "where is user today?"), classify it as "team_query" and extract just the person's name, ignoring conversational words like "today", "now", "currently", "this morning", etc.
 
 CRITICAL: NEGATION DETECTION
 Pay special attention to negation words that COMPLETELY CHANGE the meaning:
@@ -67,7 +73,7 @@ IMPORTANT PRIORITY RULES:
 3. Then determine WHERE they are working (office/remote)
 4. Location queries about their own status
 5. Holiday queries about dates/information
-6. Team queries about other people's locations
+6. Team queries about other people's locations OR general team status
 7. Not working status (sick/holiday/vacation)
 
 CONTEXT CLUES FOR LOCATIONS:
@@ -75,6 +81,14 @@ CONTEXT CLUES FOR LOCATIONS:
 - Remote: "home", "remote", "remotely", "house", "working from home", "WFH"
 - Not working: "sick", "holiday", "vacation", "day off", "unwell", "ill", "absent", "leave"
 - Location queries: "where am I", "what's my location", "my status", "current location", "where did I set"
+- Team queries: "where is [name]", "is [name] in", "find [name]", "team status", "where is my team"
+
+PERSON NAME EXTRACTION:
+When detecting team queries about specific people, extract just the core name and ignore time qualifiers:
+- "where is John today?" → extract "John"
+- "is Sarah in the office now?" → extract "Sarah" 
+- "find Mike's location this morning" → extract "Mike"
+- "where is user today?" → extract "user"
 
 SPELLING VARIATIONS TO RECOGNIZE:
 - Office: "ofice", "offce", "oficce", "offic"
@@ -91,22 +105,35 @@ EXAMPLES:
 ✅ "Where am I working today?" → location_query
 ✅ "What's my current location?" → location_query
 ✅ "Show my status" → location_query
+✅ "Where is John today?" → team_query (extract: "John")
+✅ "Is Sarah in the office?" → team_query (extract: "Sarah")
+✅ "Find user's location" → team_query (extract: "user")
+✅ "Where is my team?" → team_query (general team query)
+✅ "Team status please" → team_query (general team query)
 ✅ "When is the next holiday?" → holiday_query
-✅ "Where is my team?" → team_query
 ✅ "I don't work at the office anymore" → not_working
 ✅ "No longer working from home" → not_working
 
-Always analyze the ENTIRE message context, not just individual words.`;
+Always analyze the ENTIRE message context, not just individual words. For team queries about specific people, extract just the person's name without time qualifiers.`;
 
             const userPrompt = `Analyze this message: "${message}"
 
-Return a JSON object with:
+Return a JSON response with:
 {
     "location": "office|remote|not_working|location_query|holiday_query|team_query|unclear",
     "confidence": 0.0-1.0,
-    "reasoning": "explanation of your analysis including any negation detected",
-    "detected_phrases": ["key phrases that led to this decision"]
-}`;
+    "reasoning": "explanation of why you chose this classification",
+    "detected_phrases": ["list", "of", "key", "phrases", "found"],
+    "extracted_person_name": "person name if this is a team query about specific person, otherwise null"
+}
+
+For team queries about specific people, extract just the person's name without time qualifiers:
+- "where is John today?" → extracted_person_name: "John"
+- "is Sarah in the office now?" → extracted_person_name: "Sarah"  
+- "find user's location" → extracted_person_name: "user"
+- "where is my team?" → extracted_person_name: null (general team query)
+
+IMPORTANT: Always return valid JSON only, no other text.`;
 
             const response = await this.openai.chat.completions.create({
                 model: "gpt-3.5-turbo",
@@ -349,36 +376,33 @@ Return a JSON object with:
             }
         }
 
-        // PRIORITY 5: Check for team queries (high confidence patterns with spelling variations)
+        // PRIORITY 4.5: Check for team queries (high confidence patterns with spelling variations)
         const teamQueryPatterns = [
-            /\bwhere\s+is\s+(my\s+)?(team|teem|tema)\b/i,
-            /\b(team|teem|tema)\s+(status|locations?|overview)\b/i,
-            /\bshow\s+(me\s+)?(the\s+)?(team|teem|tema)\b/i,
-            /\b(team|teem|tema)\s+(location\s+)?overview\b/i,
-            /\bwho\s+is\s+(in\s+the\s+)?(office|ofice|offce|offfice)\b/i,
-            /\bwho\s+is\s+(working|workin|workng)\s+(today|remote|from\s+home)\b/i,
-            /\b(team|teem|tema)\s+(members?\s+)?locations?\b/i,
-            /\bwhere\s+(are|is)\s+(all\s+)?my\s+(colleagues|colegues|coleagues|workmates)\b/i,
-            // Additional team patterns
-            /\b(team|teem|tema)\s+(update|updates)\b/i,
-            /\bwho\s+is\s+(where|around|available)\b/i,
-            /\bshow\s+(team|teem|tema)\s+(status|locations)\b/i
+            /\b(where\s+(is|are)|location\s+of|find)\s+(my\s+)?(team|everyone|colleagues|coworkers|workmates)\b/i,
+            /\b(team|everyone|colleagues|coworkers|workmates)\s+(status|location|locations|overview)\b/i,
+            /\bwho\s+(is|are)\s+(in\s+the\s+)?(office|ofice|offce|home|hom|hoem|remote|remot|working)\b/i,
+            // Add patterns for specific person queries
+            /^(where\s+is|location\s+of|find)\s+\w+(\s+today|\s+now|\s+currently)?$/i,
+            /^is\s+\w+\s+(in\s+the\s+office|at\s+the\s+office|remote|at\s+home|working)/i,
+            /^\w+('s)?\s+(location|status|work\s+location)(\s+today|\s+now)?$/i
         ];
-
+        
         for (const pattern of teamQueryPatterns) {
             if (pattern.test(lowerMessage)) {
+                console.log(`🤖 Fallback: Team query detected with pattern: ${pattern}`);
+                
                 return {
                     location: 'team_query',
                     confidence: 0.9,
-                    reasoning: `Matched team query pattern: ${pattern.source}`,
-                    detected_phrases: [lowerMessage.match(pattern)?.[0] || 'team query'],
-                    source: 'rules',
-                    originalMessage: message
+                    reasoning: 'Team query detected in message',
+                    detected_phrases: [message],
+                    extracted_person_name: null, // Let the bot handle person name extraction
+                    source: 'fallback'
                 };
             }
         }
 
-        // PRIORITY 6: Check for explicit NOT working patterns (enhanced with spelling variations)
+        // PRIORITY 5: Check for explicit NOT working patterns (enhanced with spelling variations)
         const notWorkingPatterns = [
             /\bnot\s+(working|workin|workng|wokring)\b/i,
             /\b(sick|sik|sck)\s+(day|leave|today)\b/i,
@@ -411,7 +435,7 @@ Return a JSON object with:
             }
         }
 
-        // PRIORITY 7: Lower confidence single word matches with spelling variations (only if no working context)
+        // PRIORITY 6: Lower confidence single word matches with spelling variations (only if no working context)
         const singleWordPatterns = {
             office: /\b(office|ofice|offce|offfice|oficce|offic|work|wrk|wrok|site|building|bilding|buidling|workplace|workplac|workplce|workplc|hq|headquarters)\b/i,
             remote: /\b(home|hom|hoem|remote|remot|romote|reomte|rmeote|house|hse|remotely|remotly|remtely)\b/i

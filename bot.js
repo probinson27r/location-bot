@@ -127,6 +127,20 @@ class LocationBot extends ActivityHandler {
         const whereIsMatch = command.match(/^(?:where is|location)\s+(.+)$/i);
         const findMatch = command.match(/^find\s+(.+)$/i);
         
+        // BUT FIRST check if this is a team-related query
+        const teamQueries = [
+            /^(?:where is|where are)\s+(my\s+)?(team|everyone|colleagues|coworkers|workmates)$/i,
+            /^(?:location of|find)\s+(my\s+)?(team|everyone|colleagues|coworkers|workmates)$/i
+        ];
+        
+        const isTeamQuery = teamQueries.some(pattern => pattern.test(command));
+        
+        if (isTeamQuery) {
+            console.log(`👥 User ${user.display_name} requested team overview via team query: "${command}"`);
+            await this.sendTeamLocationOverview(context);
+            return;
+        }
+        
         if (whereIsMatch || findMatch) {
             const searchName = (whereIsMatch || findMatch)[1].trim();
             console.log(`🔍 User ${user.display_name} searching for: "${searchName}"`);
@@ -179,7 +193,17 @@ class LocationBot extends ActivityHandler {
                     }
                 } else if (locationParsed.location === 'team_query') {
                     console.log(`👥 AI detected team query: "${command}"`);
-                    await this.sendTeamLocationOverview(context);
+                    
+                    // Try to get person name from AI analysis first, then manual extraction
+                    let personName = locationParsed.aiAnalysis?.extracted_person_name || this.extractPersonNameFromQuery(command);
+                    
+                    if (personName && personName !== 'my team' && personName !== 'team') {
+                        console.log(`🔍 AI detected person query for: "${personName}"`);
+                        await this.handleTeamMemberLocationQuery(context, personName);
+                    } else {
+                        console.log(`👥 AI detected general team query, showing team overview`);
+                        await this.sendTeamLocationOverview(context);
+                    }
                 } else if (locationParsed.location === 'location_query') {
                     console.log(`📍 AI detected location query: "${command}"`);
                     await this.sendStatusMessage(context, user);
@@ -342,7 +366,6 @@ class LocationBot extends ActivityHandler {
                 case 'reject_location':
                     console.log(`❌ User ${user.display_name} rejected location detection from phrase: "${data.originalPhrase}"`);
                     await this.sendLocationPrompt(context, user);
-                    await context.sendActivity('No problem! Please select your correct location from the options above, or you can type "remote" or "office" directly.');
                     break;
                 
                 case 'restart_selection':
@@ -432,8 +455,7 @@ class LocationBot extends ActivityHandler {
         console.log(`📍 Sending location selection card to ${user.display_name}`);
         const locationCard = createLocationCard(user.display_name);
         
-        // Add fallback text for debugging
-        await context.sendActivity(`📍 Location prompt for ${user.display_name}:`);
+        // Send the card
         await context.sendActivity({ attachments: [locationCard] });
     }
 
@@ -638,6 +660,33 @@ class LocationBot extends ActivityHandler {
     }
 
     /**
+     * Clean up pending responses (called periodically)
+     */
+    async cleanupPendingResponses() {
+        try {
+            console.log('🧹 Running periodic cleanup of pending responses...');
+            
+            // Get current date
+            const currentDate = this.holidayService.getCurrentDate();
+            
+            // Clean up pending reminders older than 3 days
+            const threeDaysAgo = this.holidayService.getCurrentTime().subtract(3, 'days').format('YYYY-MM-DD');
+            
+            // Note: We need to clean up across all tenants, but the database method should handle tenant isolation
+            const cleanedCount = await this.database.cleanupOldPendingReminders(threeDaysAgo);
+            
+            if (cleanedCount > 0) {
+                console.log(`🧹 Cleaned up ${cleanedCount} old pending reminders (older than ${threeDaysAgo})`);
+            } else {
+                console.log('🧹 No old pending reminders to clean up');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error during cleanup:', error);
+        }
+    }
+
+    /**
      * Handle team member location queries
      */
     async handleTeamMemberLocationQuery(context, searchName) {
@@ -751,61 +800,12 @@ class LocationBot extends ActivityHandler {
                 Office: teamLocations.filter(m => m.work_location === 'Office').length
             };
             
-            // Create comprehensive text summary
-            const dateFormatted = this.holidayService.formatDate(currentDate);
-            let teamSummary = `👥 **Team Location Overview - ${dateFormatted}**\n\n`;
-            teamSummary += `📊 **Summary**: ${membersWithLocation}/${totalMembers} members have set their location\n`;
-            teamSummary += `🏠 Remote: ${locationCounts.Remote} | 🏢 Office: ${locationCounts.Office}\n\n`;
-            
-            // Add individual member details
-            teamSummary += `**Team Members:**\n`;
-            
-            // Group by location for better readability
-            const remoteMembers = teamLocations.filter(m => m.work_location === 'Remote');
-            const officeMembers = teamLocations.filter(m => m.work_location === 'Office');
-            const noLocationMembers = teamLocations.filter(m => !m.work_location);
-            
-            if (remoteMembers.length > 0) {
-                teamSummary += `\n🏠 **Remote (${remoteMembers.length}):**\n`;
-                remoteMembers.forEach(member => {
-                    const time = member.response_time ? 
-                        new Date(member.response_time).toLocaleString('en-AU', { 
-                            timeZone: 'Australia/Perth',
-                            timeStyle: 'short'
-                        }) : '';
-                    const updates = member.daily_updates > 1 ? ` (${member.daily_updates} updates)` : '';
-                    teamSummary += `   • ${member.display_name} - Last updated: ${time}${updates}\n`;
-                });
-            }
-            
-            if (officeMembers.length > 0) {
-                teamSummary += `\n🏢 **Office (${officeMembers.length}):**\n`;
-                officeMembers.forEach(member => {
-                    const time = member.response_time ? 
-                        new Date(member.response_time).toLocaleString('en-AU', { 
-                            timeZone: 'Australia/Perth',
-                            timeStyle: 'short'
-                        }) : '';
-                    const updates = member.daily_updates > 1 ? ` (${member.daily_updates} updates)` : '';
-                    teamSummary += `   • ${member.display_name} - Last updated: ${time}${updates}\n`;
-                });
-            }
-            
-            if (noLocationMembers.length > 0) {
-                teamSummary += `\n❓ **No Location Set (${noLocationMembers.length}):**\n`;
-                noLocationMembers.forEach(member => {
-                    teamSummary += `   • ${member.display_name} - ⏳ Not set yet\n`;
-                });
-            }
-            
             console.log(`✅ Creating team location card for ${teamLocations.length} members`);
-            console.log(`📝 Team summary text:`, teamSummary);
+            console.log(`📊 Stats: ${membersWithLocation}/${totalMembers} members responded, Remote: ${locationCounts.Remote}, Office: ${locationCounts.Office}`);
             
-            // Send both text summary and card
-            await context.sendActivity(teamSummary);
-            
+            // Send just the card (no text summary to avoid duplication)
             const teamCard = createTeamLocationCard(teamLocations, currentDate);
-            console.log(`🃏 Team card structure:`, JSON.stringify(teamCard, null, 2));
+            console.log(`🃏 Team card created for ${teamLocations.length} members`);
             await context.sendActivity({ attachments: [teamCard] });
             
         } catch (error) {
@@ -965,6 +965,54 @@ class LocationBot extends ActivityHandler {
             console.error('🎄 Error fetching next holidays:', error);
             await context.sendActivity('❌ Sorry, there was an error fetching the holiday information. Please try again later.');
         }
+    }
+
+    /**
+     * Extract person name from a query
+     */
+    extractPersonNameFromQuery(query) {
+        const lowerQuery = query.toLowerCase().trim();
+        
+        // Remove common conversational qualifiers
+        const timeQualifiers = /\s+(today|now|currently|this\s+morning|this\s+afternoon|right\s+now|at\s+the\s+moment)\??$/i;
+        const cleanQuery = query.replace(timeQualifiers, '').trim();
+        
+        // Pattern: "where is [name]" or "where is [name] today"  
+        let match = cleanQuery.match(/^(?:where\s+is|location\s+of)\s+(.+?)(\s+today|\s+now|\s+currently)?$/i);
+        if (match) {
+            const name = match[1].trim();
+            // Don't match team-related queries
+            if (!name.match(/^(my\s+)?(team|everyone|colleagues|coworkers|workmates)$/i)) {
+                return name;
+            }
+        }
+        
+        // Pattern: "is [name] in the office" or "is [name] remote"
+        match = cleanQuery.match(/^is\s+(.+?)\s+(in\s+the\s+office|at\s+the\s+office|remote|at\s+home|working|in\s+today)$/i);
+        if (match) {
+            return match[1].trim();
+        }
+        
+        // Pattern: "find [name]" or "find [name]'s location"  
+        match = cleanQuery.match(/^find\s+(.+?)(?:'s\s+location|'s\s+status)?$/i);
+        if (match) {
+            const name = match[1].trim();
+            if (!name.match(/^(my\s+)?(team|everyone|colleagues|coworkers|workmates)$/i)) {
+                return name;
+            }
+        }
+        
+        // Pattern: "[name]'s location" or "[name]'s status"
+        match = cleanQuery.match(/^(.+?)(?:'s\s+(?:location|status|work\s+location))$/i);
+        if (match) {
+            const name = match[1].trim();
+            if (!name.match(/^(my\s+)?(team|everyone|colleagues|coworkers|workmates)$/i)) {
+                return name;
+            }
+        }
+        
+        // Return null for general team queries or if no pattern matched
+        return null;
     }
 }
 

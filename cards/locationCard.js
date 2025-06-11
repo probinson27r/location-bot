@@ -9,49 +9,41 @@ function createLocationCard(userName, isReminder = false, reminderCount = 0) {
         : 'Where are you working today?';
     
     const subtitle = isReminder
-        ? `Hi ${userName}, we still need your location for today. Please select your work location:`
-        : `Good morning ${userName}! Please let us know where you'll be working today:`;
+        ? `Hi ${userName}, we still need your location for today.`
+        : `Hi ${userName}! Please select your work location:`;
 
     const card = {
         type: 'AdaptiveCard',
-        version: '1.4',
+        version: '1.0',
         body: [
             {
                 type: 'TextBlock',
                 text: title,
-                size: 'Large',
-                weight: 'Bolder',
-                color: 'Accent'
+                size: 'Medium',
+                weight: 'Bolder'
             },
             {
                 type: 'TextBlock',
                 text: subtitle,
-                wrap: true,
-                spacing: 'Medium'
+                wrap: true
+            }
+        ],
+        actions: [
+            {
+                type: 'Action.Submit',
+                title: '🏠 Remote',
+                data: {
+                    action: 'location_selected',
+                    location: 'Remote'
+                }
             },
             {
-                type: 'ActionSet',
-                actions: [
-                    {
-                        type: 'Action.Submit',
-                        title: '🏠 Remote',
-                        data: {
-                            action: 'location_selected',
-                            location: 'Remote'
-                        },
-                        style: 'positive'
-                    },
-                    {
-                        type: 'Action.Submit',
-                        title: '🏢 Office',
-                        data: {
-                            action: 'location_selected',
-                            location: 'Office'
-                        },
-                        style: 'positive'
-                    }
-                ],
-                spacing: 'Large'
+                type: 'Action.Submit',
+                title: '🏢 Office',
+                data: {
+                    action: 'location_selected',
+                    location: 'Office'
+                }
             }
         ]
     };
