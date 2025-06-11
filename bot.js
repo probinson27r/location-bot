@@ -37,21 +37,32 @@ class LocationBot extends ActivityHandler {
 
         // Handle regular messages
         this.onMessage(async (context, next) => {
-            await this.addConversationReference(context.activity);
-            
-            const userMessage = context.activity.text?.toLowerCase().trim();
-            const userName = context.activity.from.name || 'Unknown User';
-            const userId = context.activity.from.id;
-            
-            // Log incoming request with user details
-            console.log(`📨 Request received from ${userName} (${userId}): "${context.activity.text || '[Card Submission]'}"`);
-            
-            // Handle text commands
-            if (userMessage) {
-                await this.handleTextCommand(context, userMessage);
-            } else if (context.activity.value) {
-                // Handle card submissions
-                await this.handleCardSubmission(context);
+            try {
+                await this.addConversationReference(context.activity);
+                
+                const userMessage = context.activity.text?.toLowerCase().trim();
+                const userName = context.activity.from.name || 'Unknown User';
+                const userId = context.activity.from.id;
+                
+                // Log incoming request with user details
+                console.log(`📨 Request received from ${userName} (${userId}): "${context.activity.text || '[Card Submission]'}"`);
+                
+                // Handle text commands
+                if (userMessage) {
+                    await this.handleTextCommand(context, userMessage);
+                } else if (context.activity.value) {
+                    // Handle card submissions
+                    await this.handleCardSubmission(context);
+                }
+            } catch (error) {
+                console.error(`❌ Error processing message from ${context.activity.from.name || 'Unknown User'}:`, error);
+                
+                // Send a simple error message if we haven't already responded
+                try {
+                    await context.sendActivity('❌ Sorry, something went wrong processing your message. Please try again.');
+                } catch (responseError) {
+                    console.error('❌ Error sending error response (response may have already been sent):', responseError.message);
+                }
             }
 
             await next();
@@ -333,11 +344,15 @@ class LocationBot extends ActivityHandler {
             
         } catch (error) {
             console.error(`❌ Error sending location confirmation:`, error);
-            // Fallback to text-based confirmation
-            const locationName = parsedLocation.location === 'clear' ? 'not working' : parsedLocation.location;
-            const confidenceText = parsedLocation.confidence ? ` (${Math.round(parsedLocation.confidence * 100)}% confidence)` : '';
-            
-            await context.sendActivity(`💬 I detected you might be ${locationName} from: "${parsedLocation.originalPhrase}"${confidenceText}\n\nType "yes" to confirm or "no" to choose a different option.`);
+            // Fallback to text-based confirmation with error protection
+            try {
+                const locationName = parsedLocation.location === 'clear' ? 'not working' : parsedLocation.location;
+                const confidenceText = parsedLocation.confidence ? ` (${Math.round(parsedLocation.confidence * 100)}% confidence)` : '';
+                
+                await context.sendActivity(`💬 I detected you might be ${locationName} from: "${parsedLocation.originalPhrase}"${confidenceText}\n\nType "yes" to confirm or "no" to choose a different option.`);
+            } catch (fallbackError) {
+                console.error('❌ Error sending fallback location confirmation (response may have already been sent):', fallbackError.message);
+            }
         }
     }
 
@@ -379,8 +394,21 @@ class LocationBot extends ActivityHandler {
             }
         } catch (error) {
             console.error(`❌ Error handling card submission from ${user.display_name}:`, error);
-            const errorCard = createErrorCard(user.display_name, 'An error occurred while processing your response. Please try again.');
-            await context.sendActivity({ attachments: [errorCard] });
+            
+            // Send error response with protection against double responses
+            try {
+                const errorCard = createErrorCard(user.display_name, 'An error occurred while processing your response. Please try again.');
+                await context.sendActivity({ attachments: [errorCard] });
+            } catch (errorResponseError) {
+                console.error('❌ Error sending error card (response may have already been sent):', errorResponseError.message);
+                
+                // Try simple text fallback
+                try {
+                    await context.sendActivity('❌ Sorry, something went wrong. Please try again.');
+                } catch (textFallbackError) {
+                    console.error('❌ Error sending text fallback (response already sent):', textFallbackError.message);
+                }
+            }
         }
     }
 
