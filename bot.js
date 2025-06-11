@@ -44,18 +44,17 @@ class LocationBot extends ActivityHandler {
             try {
                 await this.addConversationReference(context.activity);
                 
-                // Create a unique message identifier for deduplication
+                // Create a unique message identifier for deduplication (without timestamp)
                 const userId = context.activity.from.id;
                 const messageText = context.activity.text || '[Card Submission]';
-                const timestamp = context.activity.timestamp || new Date().toISOString();
-                const messageId = `${userId}-${messageText}-${timestamp.substring(0, 19)}`; // Remove milliseconds for grouping
+                const messageId = `${userId}-${messageText}`; // Simple user + message combo
                 
                 // Check for duplicate messages
                 const now = Date.now();
                 if (this.recentMessages.has(messageId)) {
                     const lastProcessed = this.recentMessages.get(messageId);
                     if (now - lastProcessed < this.DEDUPLICATION_WINDOW) {
-                        console.log(`🔄 Ignoring duplicate message from ${context.activity.from.name}: "${messageText}"`);
+                        console.log(`🔄 Ignoring duplicate message from ${context.activity.from.name}: "${messageText}" (${now - lastProcessed}ms ago)`);
                         return; // Skip processing this duplicate
                     }
                 }
