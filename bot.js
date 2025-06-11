@@ -20,6 +20,10 @@ class LocationBot extends ActivityHandler {
         this.aiAgent = new AIAgent();
         this.conversationReferences = {};
         
+        // Add deduplication tracking
+        this.recentMessages = new Map(); // Map of messageId -> timestamp
+        this.DEDUPLICATION_WINDOW = 30000; // 30 seconds in milliseconds
+        
         // Handle members being added to the bot
         this.onMembersAdded(async (context, next) => {
             const membersAdded = context.activity.membersAdded;
@@ -40,9 +44,34 @@ class LocationBot extends ActivityHandler {
             try {
                 await this.addConversationReference(context.activity);
                 
+                // Create a unique message identifier for deduplication
+                const userId = context.activity.from.id;
+                const messageText = context.activity.text || '[Card Submission]';
+                const timestamp = context.activity.timestamp || new Date().toISOString();
+                const messageId = `${userId}-${messageText}-${timestamp.substring(0, 19)}`; // Remove milliseconds for grouping
+                
+                // Check for duplicate messages
+                const now = Date.now();
+                if (this.recentMessages.has(messageId)) {
+                    const lastProcessed = this.recentMessages.get(messageId);
+                    if (now - lastProcessed < this.DEDUPLICATION_WINDOW) {
+                        console.log(`🔄 Ignoring duplicate message from ${context.activity.from.name}: "${messageText}"`);
+                        return; // Skip processing this duplicate
+                    }
+                }
+                
+                // Track this message
+                this.recentMessages.set(messageId, now);
+                
+                // Clean up old entries (older than deduplication window)
+                for (const [id, processedTime] of this.recentMessages.entries()) {
+                    if (now - processedTime > this.DEDUPLICATION_WINDOW) {
+                        this.recentMessages.delete(id);
+                    }
+                }
+                
                 const userMessage = context.activity.text?.toLowerCase().trim();
                 const userName = context.activity.from.name || 'Unknown User';
-                const userId = context.activity.from.id;
                 
                 // Log incoming request with user details
                 console.log(`📨 Request received from ${userName} (${userId}): "${context.activity.text || '[Card Submission]'}"`);
