@@ -1,12 +1,12 @@
 {
   "name": "location-bot",
   "version": "1.0.0",
-  "description": "Microsoft Teams bot for tracking daily work locations",
+  "description": "A Microsoft Teams bot for tracking employee work locations",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jest",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "echo 'Linting...' && echo 'No linter configured yet'",
@@ -18,29 +18,27 @@
     "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'"
   },
   "dependencies": {
-    "axios": "^1.6.0",
     "botbuilder": "^4.20.0",
-    "dotenv": "^16.3.1",
-    "moment-timezone": "^0.5.43",
-    "node-schedule": "^2.1.1",
-    "openai": "^4.104.0",
     "restify": "^11.1.0",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.1.6",
+    "mssql": "^10.0.1",
+    "openai": "^4.20.1",
+    "axios": "^1.6.0",
+    "moment-timezone": "^0.5.43",
+    "dotenv": "^16.3.1",
+    "node-schedule": "^2.1.1"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0"
   },
   "keywords": [
-    "microsoft-teams",
     "bot",
-    "location-tracking",
-    "nodejs",
-    "bot-framework",
-    "workplace",
-    "teams-bot"
+    "teams",
+    "location",
+    "azure"
   ],
-  "author": "",
+  "author": "Your Name",
   "license": "MIT",
   "repository": {
     "type": "git",
