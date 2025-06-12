@@ -7,11 +7,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "test": "echo \"No tests specified\"",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "echo 'Linting...' && echo 'No linter configured yet'",
-    "lint:fix": "echo 'Fix linting...' && echo 'No linter configured yet'",
-    "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'"
+    "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'",
+    "postinstall": "npm prune --production"
   },
   "dependencies": {
     "@azure/msal-node": "^3.6.0",
@@ -47,7 +44,10 @@
   },
   "homepage": "https://github.com/yourusername/location-bot#readme",
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=18.0.0",
     "npm": ">=8.0.0"
+  },
+  "config": {
+    "unsafe-perm": true
   }
 }

@@ -11,16 +11,50 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm ci
+      run: npm ci --production --silent
+    
+    - name: Create deployment package
+      run: |
+        # Remove dev dependencies and unnecessary files
+        rm -rf node_modules/.cache
+        rm -rf .git
+        rm -rf .github
+        rm -rf tests
+        rm -rf *.md
+        find . -name "*.test.js" -delete
+        find . -name "*.spec.js" -delete
+        
+        # Create optimized package
+        mkdir deployment-package
+        cp -r . deployment-package/
+        cd deployment-package
+        
+        # Remove dev files
+        rm -f .gitignore
+        rm -f jest.config.js
+        rm -f nodemon.json
+        
+        # Optimize package.json for production
+        node -e "
+          const pkg = require('./package.json');
+          delete pkg.devDependencies;
+          delete pkg.scripts.dev;
+          delete pkg.scripts.test;
+          delete pkg.scripts['test:watch'];
+          delete pkg.scripts['test:coverage'];
+          delete pkg.scripts.lint;
+          delete pkg.scripts['lint:fix'];
+          require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        "
     
     - name: Azure Login
       uses: azure/login@v1
@@ -31,4 +65,4 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ secrets.AZURE_APP_NAME }}
-        package: . 
+        package: ./deployment-package 

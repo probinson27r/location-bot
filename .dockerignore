@@ -1,0 +1,69 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README*.md
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output
+
+# Development dependencies
+node_modules/jest
+node_modules/nodemon
+node_modules/@types
+
+# Build artifacts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files (keep .env.example)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Log files
+logs/
+*.log
+
+# Cache directories
+.npm
+.cache
+.parcel-cache
+
+# Deployment artifacts
+deployment-package/
+
+# Azure specific
+.azure/ 

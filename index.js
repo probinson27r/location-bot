@@ -3,16 +3,29 @@ const { BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = req
 const config = require('./config');
 const LocationBot = require('./bot');
 const LocationScheduler = require('./scheduler');
+const PerformanceMonitor = require('./utils/performance');
+
+// Initialize performance monitoring
+const perfMonitor = new PerformanceMonitor();
+console.log('🚀 Location Bot starting...');
+
+perfMonitor.startMeasure('Server Setup');
 
 // Create HTTP server
-const server = restify.createServer();
+const server = restify.createServer({
+    name: 'location-bot',
+    version: '1.0.0'
+});
 server.use(restify.plugins.bodyParser());
 
 server.listen(config.port, () => {
+    perfMonitor.endMeasure('Server Setup');
     console.log(`\n${server.name} listening on port ${config.port}`);
     console.log('\nGet Bot Framework Emulator: https://aka.ms/botframework-emulator');
     console.log('\nTo test your bot in Teams, sideload the app manifest from: https://aka.ms/teams-app-studio');
 });
+
+perfMonitor.startMeasure('Bot Adapter Setup');
 
 // Create bot adapter
 const adapter = new BotFrameworkAdapter({
@@ -26,10 +39,15 @@ adapter.onTurnError = async (context, error) => {
     await context.sendActivity('Sorry, an error occurred. Please try again later.');
 };
 
+perfMonitor.endMeasure('Bot Adapter Setup');
+perfMonitor.startMeasure('Storage Setup');
+
 // Create storage and conversation state
 const memoryStorage = new MemoryStorage();
 const conversationState = new ConversationState(memoryStorage);
 const userState = new UserState(memoryStorage);
+
+perfMonitor.endMeasure('Storage Setup');
 
 // Create the main dialog
 const bot = new LocationBot();
@@ -38,13 +56,21 @@ let scheduler;
 // Initialize bot and scheduler
 async function initializeBot() {
     try {
+        perfMonitor.startMeasure('Bot Initialization');
         await bot.initialize();
+        perfMonitor.endMeasure('Bot Initialization');
         
+        perfMonitor.startMeasure('Scheduler Initialization');
         // Initialize scheduler with bot adapter and conversation references
         scheduler = new LocationScheduler(adapter, bot.getConversationReferences());
         await scheduler.initialize();
+        perfMonitor.endMeasure('Scheduler Initialization');
         
         console.log('✅ Location bot and scheduler initialized successfully');
+        
+        // Log performance summary
+        perfMonitor.logStartupSummary();
+        
     } catch (error) {
         console.error('❌ Failed to initialize bot:', error);
         process.exit(1);
@@ -64,7 +90,8 @@ server.get('/health', async (req, res) => {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
-        scheduler: scheduler ? scheduler.getScheduleStatus() : 'not initialized'
+        scheduler: scheduler ? scheduler.getScheduleStatus() : 'not initialized',
+        performance: perfMonitor.getAllMetrics()
     };
     
     res.json(healthStatus);
@@ -234,6 +261,4 @@ setInterval(() => {
     if (bot) {
         bot.cleanupPendingResponses();
     }
-}, 60 * 60 * 1000); // 1 hour
-
-console.log('🚀 Location Bot starting...'); 
+}, 60 * 60 * 1000); // 1 hour 
