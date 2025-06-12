@@ -202,6 +202,19 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     
+    - name: Prepare for deployment
+      run: |
+        echo "Preparing Azure App Service for deployment..."
+        
+        # Stop the app service to prevent deployment conflicts
+        echo "Stopping app service to allow deployment..."
+        az webapp stop --resource-group rg-location-bot --name location-bot-app
+        
+        # Wait a moment for the stop to take effect
+        sleep 10
+        
+        echo "App service stopped, ready for deployment"
+    
     - name: Deploy to Azure App Service
       run: |
         echo "Deploying ultra-minimal package to Azure App Service..."
@@ -211,10 +224,21 @@ jobs:
           --src deployment.zip
         
         echo "Deployment completed successfully!"
+    
+    - name: Start app service and verify deployment
+      run: |
+        echo "Starting app service after deployment..."
+        az webapp start --resource-group rg-location-bot --name location-bot-app
+        
+        # Wait for app to start
+        sleep 15
         
         # Show deployment status
+        echo "Checking app service status..."
         az webapp show \
           --resource-group rg-location-bot \
           --name location-bot-app \
           --query "state" \
-          --output tsv 
+          --output tsv
+        
+        echo "Deployment and restart completed!" 
