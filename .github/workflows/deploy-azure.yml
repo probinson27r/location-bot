@@ -37,14 +37,20 @@ jobs:
         rm -rf node_modules/*/tests 2>/dev/null || true
         rm -rf node_modules/*/docs 2>/dev/null || true
         rm -rf node_modules/*/.github 2>/dev/null || true
+        rm -rf node_modules/*/examples 2>/dev/null || true
+        rm -rf node_modules/*/benchmark 2>/dev/null || true
+        rm -rf node_modules/*/*.md 2>/dev/null || true
+        
+        # Show optimized node_modules size
+        echo "Optimized node_modules size:"
+        du -sh node_modules/
+        echo "Optimized node_modules file count:"
+        find node_modules -type f | wc -l
     
     - name: Create optimized deployment artifact
       run: |
         echo "Creating deployment directory..."
         mkdir deploy
-        
-        echo "Checking what files are available..."
-        ls -la
         
         # Copy essential application files (check if they exist first)
         [ -f package.json ] && cp package.json deploy/ || echo "package.json not found"
@@ -63,8 +69,6 @@ jobs:
           echo "project = ." >> deploy/.deployment
         fi
         
-        [ -f .deployignore ] && cp .deployignore deploy/ || echo ".deployignore not found"
-        
         # Copy essential directories if they exist
         [ -d utils ] && cp -r utils deploy/ || echo "utils directory not found"
         [ -d cards ] && cp -r cards deploy/ || echo "cards directory not found"
@@ -75,21 +79,62 @@ jobs:
         [ -d node_modules ] && cp -r node_modules deploy/ || echo "node_modules not found"
         
         # Show deployment contents
-        echo "Deployment package contents:"
-        ls -la deploy/
-        echo "Deployment size:"
-        du -sh deploy/
-        echo "File count:"
+        echo "Deployment package file count before ZIP:"
         find deploy -type f | wc -l
+        echo "Deployment size before ZIP:"
+        du -sh deploy/
     
-    - name: Create deployment package
+    - name: Create highly optimized deployment package
       run: |
+        # Additional aggressive cleanup of deploy directory before ZIP
+        echo "Performing aggressive cleanup before ZIP creation..."
+        
+        # Remove all documentation and metadata files from deploy directory
+        find deploy -name "*.md" -type f -delete 2>/dev/null || true
+        find deploy -name "*.txt" -type f -delete 2>/dev/null || true
+        find deploy -name "*.yml" -type f -delete 2>/dev/null || true
+        find deploy -name "*.yaml" -type f -delete 2>/dev/null || true
+        find deploy -name "CHANGELOG*" -type f -delete 2>/dev/null || true
+        find deploy -name "LICENSE*" -type f -delete 2>/dev/null || true
+        find deploy -name "NOTICE*" -type f -delete 2>/dev/null || true
+        find deploy -name "README*" -type f -delete 2>/dev/null || true
+        find deploy -name ".gitignore" -type f -delete 2>/dev/null || true
+        find deploy -name ".gitattributes" -type f -delete 2>/dev/null || true
+        find deploy -name ".npmignore" -type f -delete 2>/dev/null || true
+        find deploy -name ".eslintrc*" -type f -delete 2>/dev/null || true
+        find deploy -name ".prettierrc*" -type f -delete 2>/dev/null || true
+        find deploy -name "*.test.js" -type f -delete 2>/dev/null || true
+        find deploy -name "*.spec.js" -type f -delete 2>/dev/null || true
+        find deploy -name "tsconfig*.json" -type f -delete 2>/dev/null || true
+        find deploy -name "jest.config.*" -type f -delete 2>/dev/null || true
+        find deploy -name "babel.config.*" -type f -delete 2>/dev/null || true
+        find deploy -name "webpack.config.*" -type f -delete 2>/dev/null || true
+        
+        # Remove empty directories
+        find deploy -type d -empty -delete 2>/dev/null || true
+        
+        echo "Final file count after aggressive cleanup:"
+        find deploy -type f | wc -l
+        
         cd deploy
-        echo "Creating deployment zip..."
-        zip -r ../deployment.zip . -x "*.git*" "*.DS_Store*"
+        echo "Creating optimized deployment zip with aggressive exclusions..."
+        
+        # Create ZIP with just the essential files
+        zip -r ../deployment.zip . \
+          --quiet \
+          -x "*.DS_Store*" \
+          -x "*/.DS_Store*" \
+          -x "*/.*" \
+          -x "*~"
+        
         cd ..
-        echo "Deployment package size:"
+        echo "Final deployment package info:"
         ls -lh deployment.zip
+        
+        # Extract and count files in the ZIP to verify optimization
+        echo "Files actually included in deployment ZIP:"
+        unzip -l deployment.zip | wc -l
+        echo "Deployment package optimization complete!"
     
     - name: Azure Login
       uses: azure/login@v1
@@ -98,7 +143,7 @@ jobs:
     
     - name: Deploy to Azure App Service
       run: |
-        echo "Deploying to Azure App Service..."
+        echo "Deploying optimized package to Azure App Service..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
           --name location-bot-app \
