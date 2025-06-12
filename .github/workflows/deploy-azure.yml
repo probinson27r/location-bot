@@ -1,3 +1,4 @@
+# Deployment workflow for Azure App Service - Optimized for minimal file count
 name: Deploy to Azure App Service
 
 on:
