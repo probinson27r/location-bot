@@ -43,28 +43,41 @@ jobs:
         echo "Creating deployment directory..."
         mkdir deploy
         
-        # Copy only essential application files
-        cp package.json deploy/
-        cp index.js deploy/
-        cp bot.js deploy/
-        cp config.js deploy/
-        cp database.js deploy/
-        cp scheduler.js deploy/
-        cp locationAliases.js deploy/
-        cp web.config deploy/
-        cp .deployment deploy/
+        echo "Checking what files are available..."
+        ls -la
         
-        # Copy essential directories
-        cp -r utils deploy/ 2>/dev/null || true
-        cp -r cards deploy/ 2>/dev/null || true
-        cp -r data deploy/ 2>/dev/null || true
-        cp -r teams-package deploy/ 2>/dev/null || true
+        # Copy essential application files (check if they exist first)
+        [ -f package.json ] && cp package.json deploy/ || echo "package.json not found"
+        [ -f index.js ] && cp index.js deploy/ || echo "index.js not found"
+        [ -f bot.js ] && cp bot.js deploy/ || echo "bot.js not found"
+        [ -f config.js ] && cp config.js deploy/ || echo "config.js not found"
+        [ -f database.js ] && cp database.js deploy/ || echo "database.js not found"
+        [ -f scheduler.js ] && cp scheduler.js deploy/ || echo "scheduler.js not found"
+        [ -f locationAliases.js ] && cp locationAliases.js deploy/ || echo "locationAliases.js not found"
+        [ -f web.config ] && cp web.config deploy/ || echo "web.config not found"
+        
+        # Copy deployment configuration files if they exist
+        [ -f .deployment ] && cp .deployment deploy/ || echo ".deployment not found - creating basic one"
+        if [ ! -f deploy/.deployment ]; then
+          echo "[config]" > deploy/.deployment
+          echo "project = ." >> deploy/.deployment
+        fi
+        
+        [ -f .deployignore ] && cp .deployignore deploy/ || echo ".deployignore not found"
+        
+        # Copy essential directories if they exist
+        [ -d utils ] && cp -r utils deploy/ || echo "utils directory not found"
+        [ -d cards ] && cp -r cards deploy/ || echo "cards directory not found"
+        [ -d data ] && cp -r data deploy/ || echo "data directory not found"
+        [ -d teams-package ] && cp -r teams-package deploy/ || echo "teams-package directory not found"
         
         # Copy optimized node_modules
-        cp -r node_modules deploy/
+        [ -d node_modules ] && cp -r node_modules deploy/ || echo "node_modules not found"
         
-        # Show deployment size
+        # Show deployment contents
         echo "Deployment package contents:"
+        ls -la deploy/
+        echo "Deployment size:"
         du -sh deploy/
         echo "File count:"
         find deploy -type f | wc -l

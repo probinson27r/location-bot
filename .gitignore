@@ -126,8 +126,7 @@ Thumbs.db
 # Bot Framework specific
 .bot
 
-# Azure deployment files
-.deployment
+# Azure deployment files (keep .deployment but ignore deploy.cmd)
 deploy.cmd
 
 # PM2 process file
