@@ -1,0 +1,123 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci --production
+
+    - name: Conservative cleanup for deployment
+      run: |
+        echo "Starting conservative cleanup..."
+        
+        # Remove obvious documentation files
+        find node_modules -name "*.md" -type f -delete 2>/dev/null || true
+        find node_modules -name "README*" -type f -delete 2>/dev/null || true
+        find node_modules -name "CHANGELOG*" -type f -delete 2>/dev/null || true
+        find node_modules -name "LICENSE*" -type f -delete 2>/dev/null || true
+        find node_modules -name "HISTORY*" -type f -delete 2>/dev/null || true
+        
+        # Remove test directories
+        find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "__tests__" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "spec" -type d -exec rm -rf {} + 2>/dev/null || true
+        
+        # Remove example directories
+        find node_modules -name "example*" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "sample*" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "demo*" -type d -exec rm -rf {} + 2>/dev/null || true
+        
+        # Remove source TypeScript files (keep compiled JS)
+        find node_modules -name "*.ts" -not -path "*/types/*" -not -name "*.d.ts" -type f -delete 2>/dev/null || true
+        
+        # Remove source maps
+        find node_modules -name "*.map" -type f -delete 2>/dev/null || true
+        
+        # Remove unnecessary files
+        find node_modules -name ".DS_Store" -type f -delete 2>/dev/null || true
+        find node_modules -name "Thumbs.db" -type f -delete 2>/dev/null || true
+        find node_modules -name ".eslintrc*" -type f -delete 2>/dev/null || true
+        find node_modules -name ".prettier*" -type f -delete 2>/dev/null || true
+        find node_modules -name "tsconfig.json" -type f -delete 2>/dev/null || true
+        find node_modules -name "jest.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "karma.conf.*" -type f -delete 2>/dev/null || true
+        
+        # Clean npm cache and logs
+        rm -rf ~/.npm 2>/dev/null || true
+        rm -rf node_modules/.cache 2>/dev/null || true
+        
+        echo "Conservative cleanup completed"
+        echo "Files after cleanup:"
+        find . -type f | wc -l
+
+    - name: Check critical files exist
+      run: |
+        echo "Checking critical application files..."
+        [ -f "index.js" ] && echo "✓ index.js exists" || echo "✗ index.js missing"
+        [ -f "package.json" ] && echo "✓ package.json exists" || echo "✗ package.json missing"
+        [ -f ".deployment" ] && echo "✓ .deployment exists" || echo "✗ .deployment missing"
+        
+        echo "Checking critical dependencies..."
+        [ -d "node_modules/botbuilder" ] && echo "✓ botbuilder exists" || echo "✗ botbuilder missing"
+        [ -d "node_modules/restify" ] && echo "✓ restify exists" || echo "✗ restify missing"
+        [ -d "node_modules/mssql" ] && echo "✓ mssql exists" || echo "✗ mssql missing"
+        
+        echo "Checking botbuilder-core testAdapter..."
+        [ -f "node_modules/botbuilder-core/lib/testAdapter.js" ] && echo "✓ testAdapter.js exists" || echo "✗ testAdapter.js missing"
+
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Stop App Service
+      run: |
+        echo "Stopping app service for deployment..."
+        az webapp stop --name location-bot-app --resource-group rg-location-bot
+
+    - name: Deploy to Azure App Service
+      run: |
+        echo "Creating deployment package..."
+        zip -r deploy.zip . -x "*.git*" "node_modules/.cache/*" "*.log"
+        
+        echo "Deploying to Azure..."
+        az webapp deployment source config-zip \
+          --resource-group rg-location-bot \
+          --name location-bot-app \
+          --src deploy.zip
+
+    - name: Start App Service
+      run: |
+        echo "Starting app service..."
+        az webapp start --name location-bot-app --resource-group rg-location-bot
+        
+        echo "Waiting for app to start..."
+        sleep 30
+        
+        echo "Checking app status..."
+        az webapp show --name location-bot-app --resource-group rg-location-bot --query "state" -o tsv
+
+    - name: Verify deployment
+      run: |
+        echo "Checking app health..."
+        curl -f https://location-bot-app.azurewebsites.net || echo "App not responding yet"
+        
+        echo "Checking Azure logs for errors..."
+        az webapp log tail --name location-bot-app --resource-group rg-location-bot --output table || echo "Logs not available yet" 
