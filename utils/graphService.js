@@ -33,7 +33,7 @@ class GraphService {
                     scopes: ['https://graph.microsoft.com/.default']
                 };
                 
-                const response = await this.msalClient.acquireTokenSilent(clientCredentialRequest);
+                const response = await this.msalClient.acquireTokenByClientCredential(clientCredentialRequest);
                 const accessToken = response.accessToken;
                 
                 // Create Graph client with the access token
@@ -175,9 +175,10 @@ class GraphService {
             
             const graphClient = await this.getGraphClient();
             
-            // Test by getting the application info
+            // Test by getting applications (should work with app-only auth)
             const appInfo = await graphClient
-                .api('/me')
+                .api('/applications')
+                .top(1)
                 .get();
             
             console.log('✅ Graph Service: Connection test successful');
