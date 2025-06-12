@@ -19,12 +19,51 @@ jobs:
         node-version: '18'
         cache: 'npm'
     
-    - name: Install production dependencies only
+    - name: Create minimal production build
       run: |
-        # Clean install with production only
-        npm ci --omit=dev --silent
+        echo "Creating minimal production deployment..."
         
-        # Remove unnecessary files from node_modules
+        # Install dependencies to a temporary location for bundling info only
+        npm ci --silent
+        
+        # Create minimal deploy directory with only essential files
+        mkdir deploy
+        
+        # Copy only essential application files
+        cp package.json deploy/
+        cp index.js deploy/
+        cp bot.js deploy/
+        cp config.js deploy/
+        cp database.js deploy/
+        cp scheduler.js deploy/
+        cp locationAliases.js deploy/
+        cp web.config deploy/
+        
+        # Copy essential directories
+        cp -r utils deploy/ 2>/dev/null || true
+        cp -r cards deploy/ 2>/dev/null || true
+        cp -r data deploy/ 2>/dev/null || true
+        cp -r teams-package deploy/ 2>/dev/null || true
+        
+        # Create deployment configuration
+        echo "[config]" > deploy/.deployment
+        echo "project = ." >> deploy/.deployment
+        
+        echo "Application files copied. Current file count:"
+        find deploy -type f | wc -l
+    
+    - name: Install production dependencies in deploy directory
+      run: |
+        cd deploy
+        echo "Installing production dependencies directly in deploy directory..."
+        
+        # Clean production install only
+        npm install --production --silent --no-audit --no-fund
+        
+        # Immediately remove unnecessary files from node_modules
+        echo "Aggressively cleaning node_modules..."
+        
+        # Remove documentation and metadata
         find node_modules -name "*.md" -type f -delete 2>/dev/null || true
         find node_modules -name "*.txt" -type f -delete 2>/dev/null || true
         find node_modules -name "*.yml" -type f -delete 2>/dev/null || true
@@ -32,109 +71,98 @@ jobs:
         find node_modules -name "CHANGELOG*" -type f -delete 2>/dev/null || true
         find node_modules -name "LICENSE*" -type f -delete 2>/dev/null || true
         find node_modules -name "NOTICE*" -type f -delete 2>/dev/null || true
-        rm -rf node_modules/.cache 2>/dev/null || true
+        find node_modules -name "README*" -type f -delete 2>/dev/null || true
+        find node_modules -name "HISTORY*" -type f -delete 2>/dev/null || true
+        find node_modules -name "AUTHORS*" -type f -delete 2>/dev/null || true
+        find node_modules -name "CONTRIBUTORS*" -type f -delete 2>/dev/null || true
+        
+        # Remove test and development files
         rm -rf node_modules/*/test 2>/dev/null || true
         rm -rf node_modules/*/tests 2>/dev/null || true
+        rm -rf node_modules/*/__tests__ 2>/dev/null || true
+        rm -rf node_modules/*/spec 2>/dev/null || true
         rm -rf node_modules/*/docs 2>/dev/null || true
+        rm -rf node_modules/*/documentation 2>/dev/null || true
         rm -rf node_modules/*/.github 2>/dev/null || true
         rm -rf node_modules/*/examples 2>/dev/null || true
+        rm -rf node_modules/*/example 2>/dev/null || true
+        rm -rf node_modules/*/samples 2>/dev/null || true
+        rm -rf node_modules/*/sample 2>/dev/null || true
         rm -rf node_modules/*/benchmark 2>/dev/null || true
-        rm -rf node_modules/*/*.md 2>/dev/null || true
+        rm -rf node_modules/*/benchmarks 2>/dev/null || true
+        rm -rf node_modules/*/.nyc_output 2>/dev/null || true
+        rm -rf node_modules/*/coverage 2>/dev/null || true
+        rm -rf node_modules/*/.coverage 2>/dev/null || true
+        rm -rf node_modules/*/.cache 2>/dev/null || true
+        rm -rf node_modules/*/cache 2>/dev/null || true
         
-        # Show optimized node_modules size
-        echo "Optimized node_modules size:"
-        du -sh node_modules/
-        echo "Optimized node_modules file count:"
-        find node_modules -type f | wc -l
-    
-    - name: Create optimized deployment artifact
-      run: |
-        echo "Creating deployment directory..."
-        mkdir deploy
+        # Remove config and build files
+        find node_modules -name ".gitignore" -type f -delete 2>/dev/null || true
+        find node_modules -name ".gitattributes" -type f -delete 2>/dev/null || true
+        find node_modules -name ".npmignore" -type f -delete 2>/dev/null || true
+        find node_modules -name ".eslintrc*" -type f -delete 2>/dev/null || true
+        find node_modules -name ".prettierrc*" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.test.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.spec.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "*test*.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "tsconfig*.json" -type f -delete 2>/dev/null || true
+        find node_modules -name "jest.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "babel.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "webpack.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "rollup.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "gulpfile.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "Gruntfile.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "Makefile*" -type f -delete 2>/dev/null || true
         
-        # Copy essential application files (check if they exist first)
-        [ -f package.json ] && cp package.json deploy/ || echo "package.json not found"
-        [ -f index.js ] && cp index.js deploy/ || echo "index.js not found"
-        [ -f bot.js ] && cp bot.js deploy/ || echo "bot.js not found"
-        [ -f config.js ] && cp config.js deploy/ || echo "config.js not found"
-        [ -f database.js ] && cp database.js deploy/ || echo "database.js not found"
-        [ -f scheduler.js ] && cp scheduler.js deploy/ || echo "scheduler.js not found"
-        [ -f locationAliases.js ] && cp locationAliases.js deploy/ || echo "locationAliases.js not found"
-        [ -f web.config ] && cp web.config deploy/ || echo "web.config not found"
+        # Remove TypeScript declaration files (not needed for runtime)
+        find node_modules -name "*.d.ts" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.d.ts.map" -type f -delete 2>/dev/null || true
         
-        # Copy deployment configuration files if they exist
-        [ -f .deployment ] && cp .deployment deploy/ || echo ".deployment not found - creating basic one"
-        if [ ! -f deploy/.deployment ]; then
-          echo "[config]" > deploy/.deployment
-          echo "project = ." >> deploy/.deployment
-        fi
+        # Remove source maps (not needed for production)
+        find node_modules -name "*.map" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.js.map" -type f -delete 2>/dev/null || true
         
-        # Copy essential directories if they exist
-        [ -d utils ] && cp -r utils deploy/ || echo "utils directory not found"
-        [ -d cards ] && cp -r cards deploy/ || echo "cards directory not found"
-        [ -d data ] && cp -r data deploy/ || echo "data directory not found"
-        [ -d teams-package ] && cp -r teams-package deploy/ || echo "teams-package directory not found"
-        
-        # Copy optimized node_modules
-        [ -d node_modules ] && cp -r node_modules deploy/ || echo "node_modules not found"
-        
-        # Show deployment contents
-        echo "Deployment package file count before ZIP:"
-        find deploy -type f | wc -l
-        echo "Deployment size before ZIP:"
-        du -sh deploy/
-    
-    - name: Create highly optimized deployment package
-      run: |
-        # Additional aggressive cleanup of deploy directory before ZIP
-        echo "Performing aggressive cleanup before ZIP creation..."
-        
-        # Remove all documentation and metadata files from deploy directory
-        find deploy -name "*.md" -type f -delete 2>/dev/null || true
-        find deploy -name "*.txt" -type f -delete 2>/dev/null || true
-        find deploy -name "*.yml" -type f -delete 2>/dev/null || true
-        find deploy -name "*.yaml" -type f -delete 2>/dev/null || true
-        find deploy -name "CHANGELOG*" -type f -delete 2>/dev/null || true
-        find deploy -name "LICENSE*" -type f -delete 2>/dev/null || true
-        find deploy -name "NOTICE*" -type f -delete 2>/dev/null || true
-        find deploy -name "README*" -type f -delete 2>/dev/null || true
-        find deploy -name ".gitignore" -type f -delete 2>/dev/null || true
-        find deploy -name ".gitattributes" -type f -delete 2>/dev/null || true
-        find deploy -name ".npmignore" -type f -delete 2>/dev/null || true
-        find deploy -name ".eslintrc*" -type f -delete 2>/dev/null || true
-        find deploy -name ".prettierrc*" -type f -delete 2>/dev/null || true
-        find deploy -name "*.test.js" -type f -delete 2>/dev/null || true
-        find deploy -name "*.spec.js" -type f -delete 2>/dev/null || true
-        find deploy -name "tsconfig*.json" -type f -delete 2>/dev/null || true
-        find deploy -name "jest.config.*" -type f -delete 2>/dev/null || true
-        find deploy -name "babel.config.*" -type f -delete 2>/dev/null || true
-        find deploy -name "webpack.config.*" -type f -delete 2>/dev/null || true
+        # Remove editor and IDE files
+        find node_modules -name ".vscode" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name ".idea" -type d -exec rm -rf {} + 2>/dev/null || true
+        find node_modules -name "*.swp" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.swo" -type f -delete 2>/dev/null || true
+        find node_modules -name "*~" -type f -delete 2>/dev/null || true
         
         # Remove empty directories
-        find deploy -type d -empty -delete 2>/dev/null || true
-        
-        echo "Final file count after aggressive cleanup:"
-        find deploy -type f | wc -l
-        
-        cd deploy
-        echo "Creating optimized deployment zip with aggressive exclusions..."
-        
-        # Create ZIP with just the essential files
-        zip -r ../deployment.zip . \
-          --quiet \
-          -x "*.DS_Store*" \
-          -x "*/.DS_Store*" \
-          -x "*/.*" \
-          -x "*~"
+        find node_modules -type d -empty -delete 2>/dev/null || true
         
         cd ..
+        echo "After aggressive node_modules cleanup:"
+        find deploy -type f | wc -l
+        echo "Deploy directory size:"
+        du -sh deploy/
+    
+    - name: Create ultra-minimal deployment package
+      run: |
+        echo "Creating ultra-minimal deployment ZIP..."
+        
+        cd deploy
+        
+        # Final cleanup before ZIP
+        find . -name ".DS_Store" -type f -delete 2>/dev/null || true
+        find . -name "Thumbs.db" -type f -delete 2>/dev/null || true
+        find . -name "*.log" -type f -delete 2>/dev/null || true
+        
+        # Create ZIP with only essential runtime files
+        zip -r ../deployment.zip . --quiet
+        
+        cd ..
+        
         echo "Final deployment package info:"
         ls -lh deployment.zip
+        echo "Final file count in deployment:"
+        unzip -l deployment.zip | tail -1 | awk '{print $2}' | sed 's/files//' | xargs echo "Files in ZIP:"
         
-        # Extract and count files in the ZIP to verify optimization
-        echo "Files actually included in deployment ZIP:"
-        unzip -l deployment.zip | wc -l
-        echo "Deployment package optimization complete!"
+        # Show the size comparison
+        echo "Deployment optimization complete!"
+        echo "Original workspace files: $(find . -name "node_modules" -prune -o -type f -print | wc -l)"
+        echo "Deployment package files: $(unzip -l deployment.zip | wc -l)"
     
     - name: Azure Login
       uses: azure/login@v1
@@ -143,7 +171,7 @@ jobs:
     
     - name: Deploy to Azure App Service
       run: |
-        echo "Deploying optimized package to Azure App Service..."
+        echo "Deploying ultra-minimal package to Azure App Service..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
           --name location-bot-app \
