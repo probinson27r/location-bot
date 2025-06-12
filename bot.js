@@ -3,6 +3,7 @@ const Database = require('./database');
 const HolidayService = require('./utils/holidays');
 const LocationAliases = require('./locationAliases');
 const AIAgent = require('./utils/aiAgent');
+const GraphService = require('./utils/graphService');
 const { 
     createLocationCard, 
     createErrorCard,
@@ -18,6 +19,7 @@ class LocationBot extends ActivityHandler {
         this.holidayService = new HolidayService();
         this.locationAliases = new LocationAliases();
         this.aiAgent = new AIAgent();
+        this.graphService = new GraphService();
         this.conversationReferences = {};
         
         // Add deduplication tracking
@@ -100,6 +102,46 @@ class LocationBot extends ActivityHandler {
     async initialize() {
         await this.database.initialize();
         console.log('Location bot initialized');
+    }
+
+    /**
+     * Update user's work location in Teams via Microsoft Graph API
+     */
+    async updateTeamsWorkLocation(user, location) {
+        // Only update Teams if Graph service is configured and user has email
+        if (!this.graphService.isConfigured()) {
+            console.log(`⚠️ Graph Service: Not configured, skipping Teams location update for ${user.display_name}`);
+            return false;
+        }
+
+        if (!user.email) {
+            console.log(`⚠️ Graph Service: No email address for ${user.display_name}, skipping Teams location update`);
+            return false;
+        }
+
+        // Only update for 'Remote' and 'Office' locations, skip 'clear'
+        if (location !== 'Remote' && location !== 'Office') {
+            console.log(`⚠️ Graph Service: Location '${location}' not applicable for Teams update`);
+            return false;
+        }
+
+        try {
+            console.log(`📊 Updating Teams work location for ${user.display_name} (${user.email}) to ${location}`);
+            
+            const success = await this.graphService.updateUserWorkLocation(user.email, location);
+            
+            if (success) {
+                console.log(`✅ Teams work location updated successfully for ${user.display_name}`);
+            } else {
+                console.log(`❌ Failed to update Teams work location for ${user.display_name}`);
+            }
+            
+            return success;
+            
+        } catch (error) {
+            console.error(`❌ Error updating Teams work location for ${user.display_name}:`, error.message);
+            return false;
+        }
     }
 
     /**
@@ -481,6 +523,7 @@ class LocationBot extends ActivityHandler {
                 await this.database.removePendingReminder(user.tenant_id, user.id, date);
             }
 
+            // Save to database first
             await this.database.saveLocationResponse(
                 user.tenant_id,
                 user.id, 
@@ -496,6 +539,11 @@ class LocationBot extends ActivityHandler {
             const actionType = isUpdate ? 'updated' : 'saved';
             
             console.log(`📍 Location ${actionType} for ${userDisplayName} (ID: ${user.id}, Tenant: ${user.tenant_id}): ${location} on ${date}`);
+            
+            // Update Teams work location via Graph API (async, don't wait for it)
+            this.updateTeamsWorkLocation(user, location).catch(error => {
+                console.error(`❌ Teams location update failed for ${userDisplayName}:`, error.message);
+            });
             
             return isUpdate;
         } catch (error) {
