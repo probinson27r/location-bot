@@ -58,7 +58,7 @@ jobs:
     - name: Deploy to Azure App Service
       run: |
         echo "Stopping app service..."
-        az webapp stop --name location-bot-app --resource-group rg-location-bot
+        az webapp stop --name location-bot-app-v2 --resource-group rg-location-bot
         
         echo "Creating deployment zip..."
         cd deploy-package
@@ -68,17 +68,17 @@ jobs:
         echo "Deploying via Azure CLI..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
-          --name location-bot-app \
+          --name location-bot-app-v2 \
           --src app-deploy.zip
         
         echo "Setting startup command..."
         az webapp config set \
-          --name location-bot-app \
+          --name location-bot-app-v2 \
           --resource-group rg-location-bot \
           --startup-file "node simple-test.js"
         
         echo "Starting app service..."
-        az webapp start --name location-bot-app --resource-group rg-location-bot
+        az webapp start --name location-bot-app-v2 --resource-group rg-location-bot
         
         echo "Waiting for startup..."
         sleep 30
@@ -86,7 +86,7 @@ jobs:
     - name: Verify deployment
       run: |
         echo "Checking app status..."
-        az webapp show --name location-bot-app --resource-group rg-location-bot --query "state" -o tsv
+        az webapp show --name location-bot-app-v2 --resource-group rg-location-bot --query "state" -o tsv
         
         echo "Testing app endpoint..."
-        curl -f https://location-bot-app.azurewebsites.net/ || echo "App not responding yet, but deployment completed" 
+        curl -f https://location-bot-app-v2.azurewebsites.net/ || echo "App not responding yet, but deployment completed" 

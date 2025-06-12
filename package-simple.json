@@ -1,0 +1,1 @@
+{"name":"ultra-simple","version":"1.0.0","main":"ultra-simple.js","engines":{"node":"20.x"},"scripts":{"start":"node ultra-simple.js"}}

@@ -17,7 +17,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
         cache: 'npm'
     
     - name: Create production deployment
@@ -169,7 +169,7 @@ jobs:
         
         # Stop the app service to prevent deployment conflicts
         echo "Stopping app service to allow deployment..."
-        az webapp stop --resource-group rg-location-bot --name location-bot-app
+        az webapp stop --resource-group rg-location-bot --name location-bot-app-v2
         
         # Wait a moment for the stop to take effect
         sleep 10
@@ -181,7 +181,7 @@ jobs:
         echo "Deploying production package to Azure App Service..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
-          --name location-bot-app \
+          --name location-bot-app-v2 \
           --src deployment.zip
         
         echo "Deployment completed successfully!"
@@ -189,7 +189,7 @@ jobs:
     - name: Start app service and verify deployment
       run: |
         echo "Starting app service after deployment..."
-        az webapp start --resource-group rg-location-bot --name location-bot-app
+        az webapp start --resource-group rg-location-bot --name location-bot-app-v2
         
         # Wait for app to start
         sleep 15
@@ -198,7 +198,7 @@ jobs:
         echo "Checking app service status..."
         az webapp show \
           --resource-group rg-location-bot \
-          --name location-bot-app \
+          --name location-bot-app-v2 \
           --query "state" \
           --output tsv
         
