@@ -1,0 +1,88 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+*.yml
+*.yaml
+
+# Documentation  
+*.md
+README*
+CHANGELOG*
+LICENSE*
+NOTICE*
+docs/
+doc/
+
+# Tests
+test/
+tests/
+__tests__/
+*.test.js
+*.spec.js
+coverage/
+.nyc_output
+
+# Development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+
+# Cache directories
+.npm/
+.cache/
+.parcel-cache/
+node_modules/.cache/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts  
+dist/
+build/
+
+# IDE files
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node modules documentation and tests
+node_modules/*/README*
+node_modules/*/CHANGELOG*
+node_modules/*/LICENSE*
+node_modules/*/NOTICE*
+node_modules/*/test/
+node_modules/*/tests/
+node_modules/*/docs/
+node_modules/*/.github/
+node_modules/*/examples/
+node_modules/*/benchmark/ 

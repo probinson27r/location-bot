@@ -19,45 +19,59 @@ jobs:
         node-version: '18'
         cache: 'npm'
     
-    - name: Install dependencies
-      run: npm ci --production --silent
-    
-    - name: Clean up unnecessary files
+    - name: Install production dependencies only
       run: |
-        # Remove development files
-        rm -rf .git
-        rm -rf .github
-        rm -rf tests
-        rm -rf test
-        rm -rf __tests__
-        rm -f *.test.js
-        rm -f *.spec.js
-        rm -f *.md
-        rm -rf docs/
-        rm -f .gitignore
-        rm -f jest.config.js
-        rm -f nodemon.json
-        rm -rf .vscode
-        rm -rf .idea
-        rm -rf coverage
-        rm -rf logs
-        rm -f *.log
-        rm -f .DS_Store
+        # Clean install with production only
+        npm ci --omit=dev --silent
         
-        # Clean up node_modules cache
-        find node_modules -name ".cache" -type d -exec rm -rf {} + 2>/dev/null || true
-        
-        # List final package contents for debugging
-        echo "Final package contents:"
-        ls -la
+        # Remove unnecessary files from node_modules
+        find node_modules -name "*.md" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.txt" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.yml" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.yaml" -type f -delete 2>/dev/null || true
+        find node_modules -name "CHANGELOG*" -type f -delete 2>/dev/null || true
+        find node_modules -name "LICENSE*" -type f -delete 2>/dev/null || true
+        find node_modules -name "NOTICE*" -type f -delete 2>/dev/null || true
+        rm -rf node_modules/.cache 2>/dev/null || true
+        rm -rf node_modules/*/test 2>/dev/null || true
+        rm -rf node_modules/*/tests 2>/dev/null || true
+        rm -rf node_modules/*/docs 2>/dev/null || true
+        rm -rf node_modules/*/.github 2>/dev/null || true
     
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    - name: Create optimized deployment artifact
+      run: |
+        echo "Creating deployment directory..."
+        mkdir deploy
+        
+        # Copy only essential application files
+        cp package.json deploy/
+        cp index.js deploy/
+        cp bot.js deploy/
+        cp config.js deploy/
+        cp database.js deploy/
+        cp scheduler.js deploy/
+        cp locationAliases.js deploy/
+        cp web.config deploy/
+        cp .deployment deploy/
+        
+        # Copy essential directories
+        cp -r utils deploy/ 2>/dev/null || true
+        cp -r cards deploy/ 2>/dev/null || true
+        cp -r data deploy/ 2>/dev/null || true
+        cp -r teams-package deploy/ 2>/dev/null || true
+        
+        # Copy optimized node_modules
+        cp -r node_modules deploy/
+        
+        # Show deployment size
+        echo "Deployment package contents:"
+        du -sh deploy/
+        echo "File count:"
+        find deploy -type f | wc -l
     
     - name: Deploy to Azure App Service
       uses: azure/webapps-deploy@v2
       with:
-        app-name: ${{ secrets.AZURE_APP_NAME }}
-        package: '.' 
+        app-name: 'location-bot-app'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: './deploy' 
