@@ -20,12 +20,9 @@ jobs:
         node-version: '18'
         cache: 'npm'
     
-    - name: Analyze dependencies and create minimal build
+    - name: Create production deployment
       run: |
-        echo "Creating ultra-minimal deployment with selective dependencies..."
-        
-        # Install dependencies locally to analyze what's actually needed
-        npm ci --silent
+        echo "Creating production deployment with all required dependencies..."
         
         # Create minimal deploy directory
         mkdir deploy
@@ -53,113 +50,83 @@ jobs:
         echo "Application files copied. Current file count:"
         find deploy -type f | wc -l
     
-    - name: Create minimal node_modules with only essential runtime files
+    - name: Install production dependencies with aggressive cleanup
       run: |
         cd deploy
-        mkdir node_modules
+        echo "Installing production dependencies..."
         
-        echo "Manually copying only essential runtime dependencies..."
+        # Install production dependencies normally to ensure all sub-dependencies are included
+        npm install --production --silent --no-audit --no-fund --no-optional
         
-        # Copy only the essential runtime files for each dependency
-        # This avoids the massive dependency tree and focuses on runtime essentials
+        echo "Dependencies installed. Starting aggressive cleanup..."
         
-        # Core dependencies - copy only main runtime files
-        echo "Copying botbuilder essentials..."
-        mkdir -p node_modules/botbuilder
-        cp -r ../node_modules/botbuilder/lib node_modules/botbuilder/ 2>/dev/null || true
-        cp ../node_modules/botbuilder/package.json node_modules/botbuilder/ 2>/dev/null || true
+        # Phase 1: Remove documentation and metadata files
+        find node_modules -name "*.md" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.txt" -type f -delete 2>/dev/null || true
+        find node_modules -name "README*" -type f -delete 2>/dev/null || true
+        find node_modules -name "CHANGELOG*" -type f -delete 2>/dev/null || true
+        find node_modules -name "LICENSE*" -type f -delete 2>/dev/null || true
+        find node_modules -name "NOTICE*" -type f -delete 2>/dev/null || true
+        find node_modules -name "HISTORY*" -type f -delete 2>/dev/null || true
+        find node_modules -name "AUTHORS*" -type f -delete 2>/dev/null || true
+        find node_modules -name "CONTRIBUTORS*" -type f -delete 2>/dev/null || true
         
-        echo "Copying restify essentials..."
-        mkdir -p node_modules/restify
-        cp -r ../node_modules/restify/lib node_modules/restify/ 2>/dev/null || true
-        cp ../node_modules/restify/package.json node_modules/restify/ 2>/dev/null || true
+        # Phase 2: Remove test and development files
+        rm -rf node_modules/*/test 2>/dev/null || true
+        rm -rf node_modules/*/tests 2>/dev/null || true
+        rm -rf node_modules/*/__tests__ 2>/dev/null || true
+        rm -rf node_modules/*/spec 2>/dev/null || true
+        rm -rf node_modules/*/docs 2>/dev/null || true
+        rm -rf node_modules/*/documentation 2>/dev/null || true
+        rm -rf node_modules/*/.github 2>/dev/null || true
+        rm -rf node_modules/*/examples 2>/dev/null || true
+        rm -rf node_modules/*/example 2>/dev/null || true
+        rm -rf node_modules/*/samples 2>/dev/null || true
+        rm -rf node_modules/*/sample 2>/dev/null || true
+        rm -rf node_modules/*/benchmark 2>/dev/null || true
+        rm -rf node_modules/*/benchmarks 2>/dev/null || true
         
-        echo "Copying mssql essentials..."
-        mkdir -p node_modules/mssql
-        cp -r ../node_modules/mssql/lib node_modules/mssql/ 2>/dev/null || true
-        cp ../node_modules/mssql/package.json node_modules/mssql/ 2>/dev/null || true
+        # Phase 3: Remove build and config files
+        find node_modules -name "*.test.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.spec.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "*test*.js" -type f -delete 2>/dev/null || true
+        find node_modules -name "tsconfig*.json" -type f -delete 2>/dev/null || true
+        find node_modules -name "jest.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "babel.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name "webpack.config.*" -type f -delete 2>/dev/null || true
+        find node_modules -name ".eslintrc*" -type f -delete 2>/dev/null || true
+        find node_modules -name ".prettierrc*" -type f -delete 2>/dev/null || true
+        find node_modules -name ".gitignore" -type f -delete 2>/dev/null || true
+        find node_modules -name ".npmignore" -type f -delete 2>/dev/null || true
         
-        echo "Copying dotenv essentials..."
-        mkdir -p node_modules/dotenv
-        cp -r ../node_modules/dotenv/lib node_modules/dotenv/ 2>/dev/null || true
-        cp ../node_modules/dotenv/package.json node_modules/dotenv/ 2>/dev/null || true
+        # Phase 4: Remove TypeScript and source maps (keep runtime JS)
+        find node_modules -name "*.d.ts" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.d.ts.map" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.js.map" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.map" -type f -delete 2>/dev/null || true
         
-        echo "Copying moment-timezone essentials..."
-        mkdir -p node_modules/moment-timezone
-        cp ../node_modules/moment-timezone/*.js node_modules/moment-timezone/ 2>/dev/null || true
-        cp ../node_modules/moment-timezone/package.json node_modules/moment-timezone/ 2>/dev/null || true
+        # Phase 5: Remove cache and coverage directories
+        rm -rf node_modules/*/.nyc_output 2>/dev/null || true
+        rm -rf node_modules/*/coverage 2>/dev/null || true
+        rm -rf node_modules/*/.coverage 2>/dev/null || true
+        rm -rf node_modules/*/.cache 2>/dev/null || true
+        rm -rf node_modules/*/cache 2>/dev/null || true
         
-        echo "Copying axios essentials..."
-        mkdir -p node_modules/axios
-        cp -r ../node_modules/axios/lib node_modules/axios/ 2>/dev/null || true
-        cp ../node_modules/axios/package.json node_modules/axios/ 2>/dev/null || true
+        # Phase 6: Remove editor files
+        find node_modules -name "*.swp" -type f -delete 2>/dev/null || true
+        find node_modules -name "*.swo" -type f -delete 2>/dev/null || true
+        find node_modules -name "*~" -type f -delete 2>/dev/null || true
+        rm -rf node_modules/*/.vscode 2>/dev/null || true
+        rm -rf node_modules/*/.idea 2>/dev/null || true
         
-        echo "Copying openai essentials..."
-        mkdir -p node_modules/openai
-        cp -r ../node_modules/openai/dist node_modules/openai/ 2>/dev/null || true
-        cp ../node_modules/openai/package.json node_modules/openai/ 2>/dev/null || true
-        
-        echo "Copying node-schedule essentials..."
-        mkdir -p node_modules/node-schedule
-        cp -r ../node_modules/node-schedule/lib node_modules/node-schedule/ 2>/dev/null || true
-        cp ../node_modules/node-schedule/package.json node_modules/node-schedule/ 2>/dev/null || true
-        
-        # Copy critical sub-dependencies that are commonly required
-        echo "Copying essential sub-dependencies..."
-        
-        # Copy only the most critical sub-dependencies
-        for dep in uuid debug ms semver; do
-          if [ -d "../node_modules/$dep" ]; then
-            echo "Copying $dep..."
-            mkdir -p "node_modules/$dep"
-            cp "../node_modules/$dep/package.json" "node_modules/$dep/" 2>/dev/null || true
-            cp "../node_modules/$dep/index.js" "node_modules/$dep/" 2>/dev/null || true
-            cp -r "../node_modules/$dep/lib" "node_modules/$dep/" 2>/dev/null || true
-            cp -r "../node_modules/$dep/dist" "node_modules/$dep/" 2>/dev/null || true
-          fi
-        done
+        # Phase 7: Remove empty directories
+        find node_modules -type d -empty -delete 2>/dev/null || true
         
         cd ..
-        echo "After selective dependency copying:"
+        echo "After aggressive cleanup (keeping all runtime dependencies):"
         find deploy -type f | wc -l
         echo "Deploy directory size:"
         du -sh deploy/
-    
-    - name: Create production package.json with minimal dependencies
-      run: |
-        cd deploy
-        
-        # Create a minimal package.json that only lists what we actually copied
-        cat > package.json << 'EOF'
-        {
-          "name": "location-bot",
-          "version": "1.0.0",
-          "description": "A Microsoft Teams bot for tracking employee work locations",
-          "main": "index.js",
-          "engines": {
-            "node": "18.x"
-          },
-          "scripts": {
-            "start": "node index.js"
-          },
-          "dependencies": {
-            "botbuilder": "^4.20.0",
-            "restify": "^11.1.0",
-            "mssql": "^10.0.1",
-            "dotenv": "^16.3.1",
-            "moment-timezone": "^0.5.43",
-            "axios": "^1.6.0",
-            "openai": "^4.20.1",
-            "node-schedule": "^2.1.1"
-          },
-          "keywords": ["teams", "bot", "location", "microsoft"],
-          "author": "Your Organization",
-          "license": "MIT"
-        }
-        EOF
-        
-        echo "Created minimal package.json"
-        cd ..
     
     - name: Final cleanup and create deployment package
       run: |
@@ -168,20 +135,14 @@ jobs:
         echo "Performing final cleanup..."
         
         # Remove any remaining unnecessary files
-        find . -name "*.md" -type f -delete 2>/dev/null || true
-        find . -name "*.txt" -type f -delete 2>/dev/null || true
-        find . -name "*.map" -type f -delete 2>/dev/null || true
-        find . -name "*.d.ts" -type f -delete 2>/dev/null || true
         find . -name ".DS_Store" -type f -delete 2>/dev/null || true
         find . -name "Thumbs.db" -type f -delete 2>/dev/null || true
         find . -name "*.log" -type f -delete 2>/dev/null || true
-        find . -name "test*" -type f -delete 2>/dev/null || true
-        find . -name "*test*" -type f -delete 2>/dev/null || true
         
         # Remove empty directories
         find . -type d -empty -delete 2>/dev/null || true
         
-        echo "FINAL file count after ultra-minimal approach:"
+        echo "FINAL file count after cleanup:"
         find . -type f | wc -l
         
         echo "Creating deployment ZIP..."
@@ -195,7 +156,7 @@ jobs:
         unzip -l deployment.zip | tail -1
         
         echo "Deployment optimization complete!"
-        echo "Target achieved: Ultra-minimal deployment with selective dependencies"
+        echo "All runtime dependencies included with aggressive cleanup"
     
     - name: Azure Login
       uses: azure/login@v1
@@ -217,7 +178,7 @@ jobs:
     
     - name: Deploy to Azure App Service
       run: |
-        echo "Deploying ultra-minimal package to Azure App Service..."
+        echo "Deploying production package to Azure App Service..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
           --name location-bot-app \
