@@ -13,7 +13,7 @@ This guide will help you deploy your Location Bot to Microsoft Azure.
 
 ### 1.1 Create Resource Group
 ```bash
-az group create --name rg-location-bot --location "East US"
+az group create --name rg-location-bot --location "Australia East"
 ```
 
 ### 1.2 Create Azure SQL Database
@@ -22,7 +22,7 @@ az group create --name rg-location-bot --location "East US"
 az sql server create \
   --name locationbot-sql-server \
   --resource-group rg-location-bot \
-  --location "East US" \
+  --location "Australia US" \
   --admin-user locationbotadmin \
   --admin-password "YourStrongPassword123!"
 

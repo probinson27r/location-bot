@@ -1,37 +1,157 @@
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 
 class Database {
     constructor() {
-        this.dbPath = config.databasePath;
-        this.ensureDataDirectory();
+        this.isProduction = config.nodeEnv === 'production';
         this.db = null;
+        
+        if (this.isProduction) {
+            // Use Azure SQL for production
+            const sql = require('mssql');
+            this.sql = sql;
+            this.config = config.database.azure;
+            console.log('🌐 Database: Using Azure SQL Database for production');
+        } else {
+            // Use SQLite for development (optional dependency)
+            try {
+                const sqlite3 = require('sqlite3').verbose();
+                this.sqlite3 = sqlite3;
+                this.dbPath = config.database.sqlite.path;
+                this.ensureDataDirectory();
+                console.log('💾 Database: Using SQLite for development');
+            } catch (err) {
+                console.error('❌ SQLite not available - falling back to Azure SQL');
+                console.log('🌐 Database: Using Azure SQL Database (fallback)');
+                this.isProduction = true;
+                const sql = require('mssql');
+                this.sql = sql;
+                this.config = config.database.azure;
+            }
+        }
     }
 
     ensureDataDirectory() {
-        const dir = path.dirname(this.dbPath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        if (!this.isProduction && this.dbPath) {
+            const dir = path.dirname(this.dbPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
         }
     }
 
     async initialize() {
+        if (this.isProduction) {
+            return this.initializeAzureSQL();
+        } else {
+            return this.initializeSQLite();
+        }
+    }
+
+    async initializeAzureSQL() {
+        try {
+            this.pool = await this.sql.connect(this.config);
+            console.log('Connected to Azure SQL Database');
+            await this.createTablesAzure();
+            return true;
+        } catch (err) {
+            console.error('Error connecting to Azure SQL Database:', err);
+            throw err;
+        }
+    }
+
+    async initializeSQLite() {
         return new Promise((resolve, reject) => {
-            this.db = new sqlite3.Database(this.dbPath, (err) => {
+            this.db = new this.sqlite3.Database(this.dbPath, (err) => {
                 if (err) {
                     console.error('Error opening database:', err);
                     reject(err);
                 } else {
                     console.log('Connected to SQLite database');
-                    this.createTables().then(resolve).catch(reject);
+                    this.createTablesSQLite().then(resolve).catch(reject);
                 }
             });
         });
     }
 
-    async createTables() {
+    async createTablesAzure() {
+        try {
+            // Create users table
+            await this.pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+                BEGIN
+                    CREATE TABLE users (
+                        id INT IDENTITY(1,1) PRIMARY KEY,
+                        tenant_id NVARCHAR(100) NOT NULL,
+                        teams_user_id NVARCHAR(200) NOT NULL,
+                        display_name NVARCHAR(200) NOT NULL,
+                        employee_number NVARCHAR(50),
+                        email NVARCHAR(200),
+                        created_at DATETIME2 DEFAULT GETDATE()
+                    );
+                    
+                    CREATE UNIQUE INDEX idx_users_unique ON users (tenant_id, teams_user_id);
+                END
+            `);
+
+            // Create location_responses table
+            await this.pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='location_responses' AND xtype='U')
+                BEGIN
+                    CREATE TABLE location_responses (
+                        id INT IDENTITY(1,1) PRIMARY KEY,
+                        tenant_id NVARCHAR(100) NOT NULL,
+                        user_id INT NOT NULL,
+                        date DATE NOT NULL,
+                        response_time DATETIME2 NOT NULL,
+                        work_location NVARCHAR(50) NOT NULL,
+                        morning_location NVARCHAR(50),
+                        afternoon_location NVARCHAR(50),
+                        reminder_count INT DEFAULT 0,
+                        FOREIGN KEY (user_id) REFERENCES users (id)
+                    );
+                END
+            `);
+
+            // Create pending_reminders table
+            await this.pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='pending_reminders' AND xtype='U')
+                BEGIN
+                    CREATE TABLE pending_reminders (
+                        id INT IDENTITY(1,1) PRIMARY KEY,
+                        tenant_id NVARCHAR(100) NOT NULL,
+                        user_id INT NOT NULL,
+                        date DATE NOT NULL,
+                        reminder_count INT DEFAULT 0,
+                        last_reminder_time DATETIME2,
+                        FOREIGN KEY (user_id) REFERENCES users (id)
+                    );
+                    
+                    CREATE UNIQUE INDEX idx_pending_reminders_unique ON pending_reminders (tenant_id, user_id, date);
+                END
+            `);
+
+            // Create performance indices
+            await this.pool.request().query(`
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_users_tenant_teams_id' AND object_id = OBJECT_ID('users'))
+                    CREATE INDEX idx_users_tenant_teams_id ON users (tenant_id, teams_user_id);
+                
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_location_responses_tenant_user_date' AND object_id = OBJECT_ID('location_responses'))
+                    CREATE INDEX idx_location_responses_tenant_user_date ON location_responses (tenant_id, user_id, date);
+                
+                IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='idx_pending_reminders_tenant_date' AND object_id = OBJECT_ID('pending_reminders'))
+                    CREATE INDEX idx_pending_reminders_tenant_date ON pending_reminders (tenant_id, date);
+            `);
+
+            console.log('Database tables created successfully');
+        } catch (err) {
+            console.error('Error creating tables:', err);
+            throw err;
+        }
+    }
+
+    async createTablesSQLite() {
         return new Promise((resolve, reject) => {
             const createTablesSQL = `
                 CREATE TABLE IF NOT EXISTS users (
@@ -88,85 +208,161 @@ class Database {
     }
 
     async insertOrUpdateUser(tenantId, teamsUserId, displayName, employeeNumber, email) {
-        return new Promise((resolve, reject) => {
-            const sql = `
-                INSERT OR REPLACE INTO users (tenant_id, teams_user_id, display_name, employee_number, email)
-                VALUES (?, ?, ?, ?, ?)
-            `;
+        if (this.isProduction) {
+            const request = this.pool.request();
+            request.input('tenantId', this.sql.NVarChar, tenantId);
+            request.input('teamsUserId', this.sql.NVarChar, teamsUserId);
+            request.input('displayName', this.sql.NVarChar, displayName);
+            request.input('employeeNumber', this.sql.NVarChar, employeeNumber);
+            request.input('email', this.sql.NVarChar, email);
             
-            this.db.run(sql, [tenantId, teamsUserId, displayName, employeeNumber, email], function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(this.lastID);
-                }
+            const result = await request.query(`
+                MERGE users AS target
+                USING (SELECT @tenantId AS tenant_id, @teamsUserId AS teams_user_id) AS source
+                ON target.tenant_id = source.tenant_id AND target.teams_user_id = source.teams_user_id
+                WHEN MATCHED THEN
+                    UPDATE SET display_name = @displayName, employee_number = @employeeNumber, email = @email
+                WHEN NOT MATCHED THEN
+                    INSERT (tenant_id, teams_user_id, display_name, employee_number, email)
+                    VALUES (@tenantId, @teamsUserId, @displayName, @employeeNumber, @email);
+                SELECT @@IDENTITY AS id;
+            `);
+            
+            return result.recordset[0]?.id;
+        } else {
+            return new Promise((resolve, reject) => {
+                const sql = `
+                    INSERT OR REPLACE INTO users (tenant_id, teams_user_id, display_name, employee_number, email)
+                    VALUES (?, ?, ?, ?, ?)
+                `;
+                
+                this.db.run(sql, [tenantId, teamsUserId, displayName, employeeNumber, email], function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                });
             });
-        });
+        }
     }
 
     async getUserByTeamsId(tenantId, teamsUserId) {
-        return new Promise((resolve, reject) => {
-            const sql = 'SELECT * FROM users WHERE tenant_id = ? AND teams_user_id = ?';
+        if (this.isProduction) {
+            const request = this.pool.request();
+            request.input('tenantId', this.sql.NVarChar, tenantId);
+            request.input('teamsUserId', this.sql.NVarChar, teamsUserId);
             
-            this.db.get(sql, [tenantId, teamsUserId], (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row);
-                }
+            const result = await request.query('SELECT * FROM users WHERE tenant_id = @tenantId AND teams_user_id = @teamsUserId');
+            return result.recordset[0];
+        } else {
+            return new Promise((resolve, reject) => {
+                const sql = 'SELECT * FROM users WHERE tenant_id = ? AND teams_user_id = ?';
+                
+                this.db.get(sql, [tenantId, teamsUserId], (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row);
+                    }
+                });
             });
-        });
+        }
     }
 
     async saveLocationResponse(tenantId, userId, date, workLocation, morningLocation = null, afternoonLocation = null, reminderCount = 0) {
-        return new Promise((resolve, reject) => {
-            const sql = `
+        if (this.isProduction) {
+            const request = this.pool.request();
+            request.input('tenantId', this.sql.NVarChar, tenantId);
+            request.input('userId', this.sql.Int, userId);
+            request.input('date', this.sql.Date, date);
+            request.input('workLocation', this.sql.NVarChar, workLocation);
+            request.input('morningLocation', this.sql.NVarChar, morningLocation);
+            request.input('afternoonLocation', this.sql.NVarChar, afternoonLocation);
+            request.input('reminderCount', this.sql.Int, reminderCount);
+            
+            const result = await request.query(`
                 INSERT INTO location_responses 
                 (tenant_id, user_id, date, response_time, work_location, morning_location, afternoon_location, reminder_count)
-                VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?)
-            `;
+                VALUES (@tenantId, @userId, @date, GETDATE(), @workLocation, @morningLocation, @afternoonLocation, @reminderCount);
+                SELECT @@IDENTITY AS id;
+            `);
             
-            this.db.run(sql, [tenantId, userId, date, workLocation, morningLocation, afternoonLocation, reminderCount], function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(this.lastID);
-                }
+            return result.recordset[0]?.id;
+        } else {
+            return new Promise((resolve, reject) => {
+                const sql = `
+                    INSERT INTO location_responses 
+                    (tenant_id, user_id, date, response_time, work_location, morning_location, afternoon_location, reminder_count)
+                    VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?)
+                `;
+                
+                this.db.run(sql, [tenantId, userId, date, workLocation, morningLocation, afternoonLocation, reminderCount], function(err) {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(this.lastID);
+                    }
+                });
             });
-        });
+        }
     }
 
     async hasUserRespondedToday(tenantId, userId, date) {
-        return new Promise((resolve, reject) => {
-            const sql = 'SELECT COUNT(*) as count FROM location_responses WHERE tenant_id = ? AND user_id = ? AND date = ?';
+        if (this.isProduction) {
+            const request = this.pool.request();
+            request.input('tenantId', this.sql.NVarChar, tenantId);
+            request.input('userId', this.sql.Int, userId);
+            request.input('date', this.sql.Date, date);
             
-            this.db.get(sql, [tenantId, userId, date], (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row.count > 0);
-                }
+            const result = await request.query('SELECT COUNT(*) as count FROM location_responses WHERE tenant_id = @tenantId AND user_id = @userId AND date = @date');
+            return result.recordset[0].count > 0;
+        } else {
+            return new Promise((resolve, reject) => {
+                const sql = 'SELECT COUNT(*) as count FROM location_responses WHERE tenant_id = ? AND user_id = ? AND date = ?';
+                
+                this.db.get(sql, [tenantId, userId, date], (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row.count > 0);
+                    }
+                });
             });
-        });
+        }
     }
 
     async getLatestLocationForUser(tenantId, userId, date) {
-        return new Promise((resolve, reject) => {
-            const sql = `
-                SELECT * FROM location_responses 
-                WHERE tenant_id = ? AND user_id = ? AND date = ? 
-                ORDER BY response_time DESC 
-                LIMIT 1
-            `;
+        if (this.isProduction) {
+            const request = this.pool.request();
+            request.input('tenantId', this.sql.NVarChar, tenantId);
+            request.input('userId', this.sql.Int, userId);
+            request.input('date', this.sql.Date, date);
             
-            this.db.get(sql, [tenantId, userId, date], (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row);
-                }
+            const result = await request.query(`
+                SELECT TOP 1 * FROM location_responses 
+                WHERE tenant_id = @tenantId AND user_id = @userId AND date = @date 
+                ORDER BY response_time DESC
+            `);
+            return result.recordset[0];
+        } else {
+            return new Promise((resolve, reject) => {
+                const sql = `
+                    SELECT * FROM location_responses 
+                    WHERE tenant_id = ? AND user_id = ? AND date = ? 
+                    ORDER BY response_time DESC 
+                    LIMIT 1
+                `;
+                
+                this.db.get(sql, [tenantId, userId, date], (err, row) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row);
+                    }
+                });
             });
-        });
+        }
     }
 
     async getUserLocationHistory(tenantId, userId, date) {
