@@ -24,24 +24,34 @@ jobs:
     
     - name: Create deployment package
       run: |
-        # Remove dev dependencies and unnecessary files
-        rm -rf node_modules/.cache
-        rm -rf .git
-        rm -rf .github
-        rm -rf tests
-        rm -rf *.md
-        find . -name "*.test.js" -delete
-        find . -name "*.spec.js" -delete
+        # Create deployment package directory
+        mkdir -p ../deployment-package
         
-        # Create optimized package
-        mkdir deployment-package
-        cp -r . deployment-package/
-        cd deployment-package
+        # Copy files using rsync to exclude unnecessary items
+        rsync -av --exclude='node_modules/.cache' \
+                  --exclude='.git' \
+                  --exclude='.github' \
+                  --exclude='tests' \
+                  --exclude='test' \
+                  --exclude='__tests__' \
+                  --exclude='*.test.js' \
+                  --exclude='*.spec.js' \
+                  --exclude='*.md' \
+                  --exclude='docs/' \
+                  --exclude='.gitignore' \
+                  --exclude='jest.config.js' \
+                  --exclude='nodemon.json' \
+                  --exclude='.vscode' \
+                  --exclude='.idea' \
+                  --exclude='coverage' \
+                  --exclude='logs' \
+                  --exclude='*.log' \
+                  --exclude='.DS_Store' \
+                  --exclude='deployment-package' \
+                  ./ ../deployment-package/
         
-        # Remove dev files
-        rm -f .gitignore
-        rm -f jest.config.js
-        rm -f nodemon.json
+        # Move to deployment package directory
+        cd ../deployment-package
         
         # Optimize package.json for production
         node -e "
@@ -55,6 +65,15 @@ jobs:
           delete pkg.scripts['lint:fix'];
           require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
         "
+        
+        # Clean up any remaining dev files
+        find . -name "*.test.js" -delete 2>/dev/null || true
+        find . -name "*.spec.js" -delete 2>/dev/null || true
+        rm -rf node_modules/.cache 2>/dev/null || true
+        
+        # List contents for debugging
+        echo "Deployment package contents:"
+        ls -la
     
     - name: Azure Login
       uses: azure/login@v1
@@ -65,4 +84,4 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ secrets.AZURE_APP_NAME }}
-        package: ./deployment-package 
+        package: ../deployment-package 
