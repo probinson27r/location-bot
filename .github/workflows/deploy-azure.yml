@@ -22,57 +22,33 @@ jobs:
     - name: Install dependencies
       run: npm ci --production --silent
     
-    - name: Create deployment package
+    - name: Clean up unnecessary files
       run: |
-        # Create deployment package directory
-        mkdir -p ../deployment-package
+        # Remove development files
+        rm -rf .git
+        rm -rf .github
+        rm -rf tests
+        rm -rf test
+        rm -rf __tests__
+        rm -f *.test.js
+        rm -f *.spec.js
+        rm -f *.md
+        rm -rf docs/
+        rm -f .gitignore
+        rm -f jest.config.js
+        rm -f nodemon.json
+        rm -rf .vscode
+        rm -rf .idea
+        rm -rf coverage
+        rm -rf logs
+        rm -f *.log
+        rm -f .DS_Store
         
-        # Copy files using rsync to exclude unnecessary items
-        rsync -av --exclude='node_modules/.cache' \
-                  --exclude='.git' \
-                  --exclude='.github' \
-                  --exclude='tests' \
-                  --exclude='test' \
-                  --exclude='__tests__' \
-                  --exclude='*.test.js' \
-                  --exclude='*.spec.js' \
-                  --exclude='*.md' \
-                  --exclude='docs/' \
-                  --exclude='.gitignore' \
-                  --exclude='jest.config.js' \
-                  --exclude='nodemon.json' \
-                  --exclude='.vscode' \
-                  --exclude='.idea' \
-                  --exclude='coverage' \
-                  --exclude='logs' \
-                  --exclude='*.log' \
-                  --exclude='.DS_Store' \
-                  --exclude='deployment-package' \
-                  ./ ../deployment-package/
+        # Clean up node_modules cache
+        find node_modules -name ".cache" -type d -exec rm -rf {} + 2>/dev/null || true
         
-        # Move to deployment package directory
-        cd ../deployment-package
-        
-        # Optimize package.json for production
-        node -e "
-          const pkg = require('./package.json');
-          delete pkg.devDependencies;
-          delete pkg.scripts.dev;
-          delete pkg.scripts.test;
-          delete pkg.scripts['test:watch'];
-          delete pkg.scripts['test:coverage'];
-          delete pkg.scripts.lint;
-          delete pkg.scripts['lint:fix'];
-          require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-        "
-        
-        # Clean up any remaining dev files
-        find . -name "*.test.js" -delete 2>/dev/null || true
-        find . -name "*.spec.js" -delete 2>/dev/null || true
-        rm -rf node_modules/.cache 2>/dev/null || true
-        
-        # List contents for debugging
-        echo "Deployment package contents:"
+        # List final package contents for debugging
+        echo "Final package contents:"
         ls -la
     
     - name: Azure Login
@@ -84,4 +60,4 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ secrets.AZURE_APP_NAME }}
-        package: ../deployment-package 
+        package: '.' 

@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "description": "A Microsoft Teams bot for tracking employee work locations",
   "main": "index.js",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"No tests specified\"",
-    "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'",
-    "postinstall": "npm prune --production"
+    "setup": "cp env.example .env && echo 'Please edit .env with your Bot Framework credentials'"
   },
   "dependencies": {
     "@azure/msal-node": "^3.6.0",
@@ -20,34 +21,9 @@
     "mssql": "^10.0.1",
     "node-schedule": "^2.1.1",
     "openai": "^4.20.1",
-    "restify": "^11.1.0",
-    "sqlite3": "^5.1.6"
+    "restify": "^11.1.0"
   },
-  "devDependencies": {
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.1"
-  },
-  "keywords": [
-    "bot",
-    "teams",
-    "location",
-    "azure"
-  ],
-  "author": "Your Name",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/yourusername/location-bot.git"
-  },
-  "bugs": {
-    "url": "https://github.com/yourusername/location-bot/issues"
-  },
-  "homepage": "https://github.com/yourusername/location-bot#readme",
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  },
-  "config": {
-    "unsafe-perm": true
-  }
+  "keywords": ["teams", "bot", "location", "microsoft"],
+  "author": "Your Organization",
+  "license": "MIT"
 }
