@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>5d6a9cc0-298f-4387-b02d-e485e0457024</id>
+  <author>N/A</author>
+  <deployer>GITHUB_ZIP_DEPLOY</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>{"type":"deployment","sha":"fce468a1a9c4a259abeca7cc5149b44cef384211","repoName":"probinson27r/location-bot","actor":"probinson27r","slotName":"production","commitMessage":"Fix deduplication logic - remove timestamp dependency for better duplicate detection"}</message>
+  <progress></progress>
+  <status>Success</status>
+  <statusText></statusText>
+  <lastSuccessEndTime>2025-06-11T16:23:29.6347591Z</lastSuccessEndTime>
+  <receivedTime>2025-06-11T16:22:07.7673714Z</receivedTime>
+  <startTime>2025-06-11T16:22:09.2389557Z</startTime>
+  <endTime>2025-06-11T16:23:29.6347591Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>

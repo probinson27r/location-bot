@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>ca3b4886-c50c-43f1-b694-a10407f54a29</id>
+  <author>N/A</author>
+  <deployer>GITHUB_ZIP_DEPLOY</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>{"type":"deployment","sha":"ff1bd0dcfaf49b22ec24258aed8e6a1027687e57","repoName":"probinson27r/location-bot","actor":"probinson27r","slotName":"production","commitMessage":"Fix database: Add Azure SQL support with SQLite fallback for production deployment"}</message>
+  <progress></progress>
+  <status>Success</status>
+  <statusText></statusText>
+  <lastSuccessEndTime>2025-06-12T03:52:13.9291536Z</lastSuccessEndTime>
+  <receivedTime>2025-06-12T03:39:05.8557387Z</receivedTime>
+  <startTime>2025-06-12T03:39:07.1164225Z</startTime>
+  <endTime>2025-06-12T03:52:13.9291536Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>

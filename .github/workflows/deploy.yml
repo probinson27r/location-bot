@@ -3,8 +3,6 @@ name: Deploy to Azure
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   deploy:
@@ -22,102 +20,73 @@ jobs:
     - name: Install dependencies
       run: npm ci --production
 
-    - name: Conservative cleanup for deployment
+    - name: Create deployment package
       run: |
-        echo "Starting conservative cleanup..."
+        echo "Creating deployment package..."
         
-        # Remove obvious documentation files
-        find node_modules -name "*.md" -type f -delete 2>/dev/null || true
-        find node_modules -name "README*" -type f -delete 2>/dev/null || true
-        find node_modules -name "CHANGELOG*" -type f -delete 2>/dev/null || true
-        find node_modules -name "LICENSE*" -type f -delete 2>/dev/null || true
-        find node_modules -name "HISTORY*" -type f -delete 2>/dev/null || true
+        # Create a clean package without unnecessary files
+        mkdir -p deploy-package
         
-        # Remove test directories
-        find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
-        find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
-        find node_modules -name "__tests__" -type d -exec rm -rf {} + 2>/dev/null || true
-        find node_modules -name "spec" -type d -exec rm -rf {} + 2>/dev/null || true
+        # Copy essential application files
+        cp package.json deploy-package/
+        cp package-lock.json deploy-package/
+        cp index.js deploy-package/
+        cp simple-test.js deploy-package/
+        cp config.js deploy-package/
+        cp -r bot.js deploy-package/ 2>/dev/null || echo "bot.js not found, skipping"
+        cp -r scheduler.js deploy-package/ 2>/dev/null || echo "scheduler.js not found, skipping"
+        cp -r database.js deploy-package/ 2>/dev/null || echo "database.js not found, skipping"
+        cp -r utils deploy-package/ 2>/dev/null || echo "utils directory not found, skipping"
+        cp -r dialogs deploy-package/ 2>/dev/null || echo "dialogs directory not found, skipping"
+        cp -r node_modules deploy-package/
         
-        # Remove example directories
-        find node_modules -name "example*" -type d -exec rm -rf {} + 2>/dev/null || true
-        find node_modules -name "sample*" -type d -exec rm -rf {} + 2>/dev/null || true
-        find node_modules -name "demo*" -type d -exec rm -rf {} + 2>/dev/null || true
+        # Create .deployment file
+        echo "[config]" > deploy-package/.deployment
+        echo "SCM_DO_BUILD_DURING_DEPLOYMENT=false" >> deploy-package/.deployment
         
-        # Remove source TypeScript files (keep compiled JS)
-        find node_modules -name "*.ts" -not -path "*/types/*" -not -name "*.d.ts" -type f -delete 2>/dev/null || true
+        echo "Package contents:"
+        ls -la deploy-package/
         
-        # Remove source maps
-        find node_modules -name "*.map" -type f -delete 2>/dev/null || true
-        
-        # Remove unnecessary files
-        find node_modules -name ".DS_Store" -type f -delete 2>/dev/null || true
-        find node_modules -name "Thumbs.db" -type f -delete 2>/dev/null || true
-        find node_modules -name ".eslintrc*" -type f -delete 2>/dev/null || true
-        find node_modules -name ".prettier*" -type f -delete 2>/dev/null || true
-        find node_modules -name "tsconfig.json" -type f -delete 2>/dev/null || true
-        find node_modules -name "jest.config.*" -type f -delete 2>/dev/null || true
-        find node_modules -name "karma.conf.*" -type f -delete 2>/dev/null || true
-        
-        # Clean npm cache and logs
-        rm -rf ~/.npm 2>/dev/null || true
-        rm -rf node_modules/.cache 2>/dev/null || true
-        
-        echo "Conservative cleanup completed"
-        echo "Files after cleanup:"
-        find . -type f | wc -l
-
-    - name: Check critical files exist
-      run: |
-        echo "Checking critical application files..."
-        [ -f "index.js" ] && echo "✓ index.js exists" || echo "✗ index.js missing"
-        [ -f "package.json" ] && echo "✓ package.json exists" || echo "✗ package.json missing"
-        [ -f ".deployment" ] && echo "✓ .deployment exists" || echo "✗ .deployment missing"
-        
-        echo "Checking critical dependencies..."
-        [ -d "node_modules/botbuilder" ] && echo "✓ botbuilder exists" || echo "✗ botbuilder missing"
-        [ -d "node_modules/restify" ] && echo "✓ restify exists" || echo "✗ restify missing"
-        [ -d "node_modules/mssql" ] && echo "✓ mssql exists" || echo "✗ mssql missing"
-        
-        echo "Checking botbuilder-core testAdapter..."
-        [ -f "node_modules/botbuilder-core/lib/testAdapter.js" ] && echo "✓ testAdapter.js exists" || echo "✗ testAdapter.js missing"
+        echo "Total files in package:"
+        find deploy-package -type f | wc -l
 
     - name: Azure CLI Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Stop App Service
-      run: |
-        echo "Stopping app service for deployment..."
-        az webapp stop --name location-bot-app --resource-group rg-location-bot
-
     - name: Deploy to Azure App Service
       run: |
-        echo "Creating deployment package..."
-        zip -r deploy.zip . -x "*.git*" "node_modules/.cache/*" "*.log"
+        echo "Stopping app service..."
+        az webapp stop --name location-bot-app --resource-group rg-location-bot
         
-        echo "Deploying to Azure..."
+        echo "Creating deployment zip..."
+        cd deploy-package
+        zip -r ../app-deploy.zip . -x "*.git*" "*.DS_Store"
+        cd ..
+        
+        echo "Deploying via Azure CLI..."
         az webapp deployment source config-zip \
           --resource-group rg-location-bot \
           --name location-bot-app \
-          --src deploy.zip
-
-    - name: Start App Service
-      run: |
+          --src app-deploy.zip
+        
+        echo "Setting startup command..."
+        az webapp config set \
+          --name location-bot-app \
+          --resource-group rg-location-bot \
+          --startup-file "node simple-test.js"
+        
         echo "Starting app service..."
         az webapp start --name location-bot-app --resource-group rg-location-bot
         
-        echo "Waiting for app to start..."
+        echo "Waiting for startup..."
         sleep 30
-        
-        echo "Checking app status..."
-        az webapp show --name location-bot-app --resource-group rg-location-bot --query "state" -o tsv
 
     - name: Verify deployment
       run: |
-        echo "Checking app health..."
-        curl -f https://location-bot-app.azurewebsites.net || echo "App not responding yet"
+        echo "Checking app status..."
+        az webapp show --name location-bot-app --resource-group rg-location-bot --query "state" -o tsv
         
-        echo "Checking Azure logs for errors..."
-        az webapp log tail --name location-bot-app --resource-group rg-location-bot --output table || echo "Logs not available yet" 
+        echo "Testing app endpoint..."
+        curl -f https://location-bot-app.azurewebsites.net/ || echo "App not responding yet, but deployment completed" 

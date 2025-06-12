@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>65c3290b-1dbc-47d4-9ea0-85638fd27ca6</id>
+  <author>N/A</author>
+  <deployer>GITHUB_ZIP_DEPLOY</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>{"type":"deployment","sha":"5b4af97f6bd87eaf72de97588db139f95c5ff480","repoName":"probinson27r/location-bot","actor":"probinson27r","slotName":"production","commitMessage":"Fix Microsoft Graph authentication method to use client credentials flow"}</message>
+  <progress></progress>
+  <status>Success</status>
+  <statusText></statusText>
+  <lastSuccessEndTime>2025-06-12T03:02:52.2925266Z</lastSuccessEndTime>
+  <receivedTime>2025-06-12T02:45:20.1963809Z</receivedTime>
+  <startTime>2025-06-12T02:45:21.6458639Z</startTime>
+  <endTime>2025-06-12T03:02:52.2925266Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>

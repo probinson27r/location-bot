@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>66699b8b-a74c-49dd-95b8-653069bf506b</id>
+  <author>N/A</author>
+  <deployer>GITHUB_ZIP_DEPLOY</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>{"type":"deployment","sha":"4441ac084a29e740ad9f2811a7b584e63a441580","repoName":"probinson27r/location-bot","actor":"probinson27r","slotName":"production","commitMessage":"Add comprehensive Teams integration documentation"}</message>
+  <progress></progress>
+  <status>Success</status>
+  <statusText></statusText>
+  <lastSuccessEndTime>2025-06-12T03:17:52.8157459Z</lastSuccessEndTime>
+  <receivedTime>2025-06-12T03:03:46.6232762Z</receivedTime>
+  <startTime>2025-06-12T03:03:47.979805Z</startTime>
+  <endTime>2025-06-12T03:17:52.8157459Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>

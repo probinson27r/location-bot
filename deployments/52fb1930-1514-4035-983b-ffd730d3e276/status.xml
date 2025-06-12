@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<deployment>
+  <id>52fb1930-1514-4035-983b-ffd730d3e276</id>
+  <author>N/A</author>
+  <deployer>GITHUB_ZIP_DEPLOY</deployer>
+  <authorEmail>N/A</authorEmail>
+  <message>{"type":"deployment","sha":"a1dac26ef436a9c56882f2f676fe33246fc6e7c8","repoName":"probinson27r/location-bot","actor":"probinson27r","slotName":"production","commitMessage":"Fix deployment: Simplify ZIP Deploy process to resolve deployment failures"}</message>
+  <progress></progress>
+  <status>Success</status>
+  <statusText></statusText>
+  <lastSuccessEndTime>2025-06-12T03:29:51.8864998Z</lastSuccessEndTime>
+  <receivedTime>2025-06-12T03:29:08.6706585Z</receivedTime>
+  <startTime>2025-06-12T03:29:09.9687919Z</startTime>
+  <endTime>2025-06-12T03:29:51.8864998Z</endTime>
+  <complete>True</complete>
+  <is_temp>False</is_temp>
+  <is_readonly>True</is_readonly>
+  <buildSummary />
+</deployment>
